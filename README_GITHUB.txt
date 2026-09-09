@@ -1,24 +1,15 @@
-LEE FACIL MANGAS - VERSION PUBLICA PERSONALIZABLE
+LEE FACIL MANGAS - LECTOR ACTUALIZADO
 
-EL LECTOR AHORA TIENE DOS CONTROLES:
+En cada capítulo aparecen DOS controles separados:
 
-1. TAMAÑO GENERAL
-- Chico
-- Normal
-- Grande
-- Muy grande
+TAMAÑO:
+[ Chico ] [ Normal ] [ Grande ] [ Muy grande ]
 
-2. ANCHO
-- Estrecho
-- Normal
-- Gordo
-- Muy gordo
+ANCHO DE PÁGINA:
+[ Estrecho ] [ Normal ] [ Gordo ] [ Muy gordo ]
 
-Las dos preferencias se guardan automáticamente en el navegador de cada lector.
+El segundo control cambia el ancho de la página y funciona independientemente del tamaño general.
+Las preferencias se guardan en el navegador.
 
-Puedes combinar ambas opciones, por ejemplo:
-- Chico + Estrecho
-- Grande + Gordo
-- Muy grande + Muy gordo
-
-Sube todos los archivos de esta carpeta a GitHub Pages.
+IMPORTANTE:
+Si GitHub sigue mostrando la versión anterior, fuerza la actualización del navegador con Ctrl+F5.

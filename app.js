@@ -101,11 +101,11 @@ async function openChapter(mid,tid,cid,tomo,cap){
      </div>
 
      <div class="setting-group width-group">
-       <span class="settings-label">Ancho:</span>
-       <button class="width-btn ${readerWidth==='estrecho'?'active':''}" onclick="setReaderWidth('estrecho')">Estrecho</button>
-       <button class="width-btn ${readerWidth==='normal'?'active':''}" onclick="setReaderWidth('normal')">Normal</button>
-       <button class="width-btn ${readerWidth==='gordo'?'active':''}" onclick="setReaderWidth('gordo')">Gordo</button>
-       <button class="width-btn ${readerWidth==='muy-gordo'?'active':''}" onclick="setReaderWidth('muy-gordo')">Muy gordo</button>
+       <span class="settings-label width-label">Ancho de página:</span>
+       <button title="Página más estrecha" class="width-btn ${readerWidth==='estrecho'?'active':''}" onclick="setReaderWidth('estrecho')">Estrecho</button>
+       <button title="Ancho normal" class="width-btn ${readerWidth==='normal'?'active':''}" onclick="setReaderWidth('normal')">Normal</button>
+       <button title="Página más ancha" class="width-btn ${readerWidth==='gordo'?'active':''}" onclick="setReaderWidth('gordo')">Gordo</button>
+       <button title="Página mucho más ancha" class="width-btn ${readerWidth==='muy-gordo'?'active':''}" onclick="setReaderWidth('muy-gordo')">Muy gordo</button>
      </div>
 
    </div>
