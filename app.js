@@ -40,6 +40,7 @@ function goHome(){
 }
 
 async function openManga(id){
+ document.body.classList.remove('reader-mode');
  const {data:m}=await supabaseClient.from('mangas').select('*').eq('id',id).single();
  const {data:ts}=await supabaseClient.from('tomos').select('*').eq('manga_id',id).order('numero');
 
@@ -57,6 +58,7 @@ async function openManga(id){
 }
 
 async function openTomo(mid,tid,num){
+ document.body.classList.remove('reader-mode');
  const {data:cs}=await supabaseClient.from('capitulos').select('*').eq('tomo_id',tid).order('numero');
 
  app.innerHTML=`
@@ -119,6 +121,7 @@ function chapterButton(direction, chapter, label){
 }
 
 async function openChapter(mid,tid,cid,tomo,cap){
+ document.body.classList.add('reader-mode');
  app.innerHTML='<div class="loading">Cargando capítulo...</div>';
 
  const [pagesResult, nav] = await Promise.all([

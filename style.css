@@ -211,3 +211,24 @@ main{padding:35px 5%;max-width:1500px;margin:auto}
   .reader-meta-name{font-size:13px}
   .reader-meta-location{font-size:11px}
 }
+
+
+/* Mientras se lee un capítulo, ocultar el buscador y elementos de búsqueda globales. */
+body.reader-mode .search,
+body.reader-mode .search-bar,
+body.reader-mode .search-container,
+body.reader-mode #search,
+body.reader-mode #searchInput,
+body.reader-mode input[placeholder*="Buscar"],
+body.reader-mode input[placeholder*="buscar"],
+body.reader-mode .global-search{
+  display:none !important;
+}
+
+/* Si el buscador está dentro de la cabecera, mantenemos la cabecera limpia. */
+body.reader-mode header .search,
+body.reader-mode header .search-bar,
+body.reader-mode header .search-container,
+body.reader-mode header input{
+  display:none !important;
+}
