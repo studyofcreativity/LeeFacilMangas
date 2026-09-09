@@ -164,6 +164,9 @@ async function openChapter(mid,tid,cid,tomo,cap){
        <button class="width-btn ${readerWidth==='gordo'?'active':''}" onclick="setReaderWidth('gordo')">Gordo</button>
        <button class="width-btn ${readerWidth==='muy-gordo'?'active':''}" onclick="setReaderWidth('muy-gordo')">Muy gordo</button>
      </div>
+     <div class="toolbar-section toolbar-fullscreen">
+       <button id="fullscreenBtn" class="fullscreen-btn" onclick="toggleFullscreen()">⛶ Pantalla completa</button>
+     </div>
    </aside>
 
    <div class="chapter-reader-content">
@@ -210,6 +213,31 @@ async function openChapter(mid,tid,cid,tomo,cap){
 
  window.scrollTo(0,0);
 }
+
+async function toggleFullscreen(){
+ const target=document.querySelector('.chapter-reader-page');
+ if(!target) return;
+ try{
+   if(!document.fullscreenElement){
+     if(target.requestFullscreen) await target.requestFullscreen();
+     else if(target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+   }else{
+     if(document.exitFullscreen) await document.exitFullscreen();
+     else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+   }
+ }catch(e){
+   console.error('No se pudo activar pantalla completa:',e);
+ }
+}
+
+function updateFullscreenButton(){
+ const btn=document.getElementById('fullscreenBtn');
+ if(!btn) return;
+ btn.textContent=(document.fullscreenElement || document.webkitFullscreenElement) ? '⛶ Salir de pantalla completa' : '⛶ Pantalla completa';
+}
+
+document.addEventListener('fullscreenchange',updateFullscreenButton);
+document.addEventListener('webkitfullscreenchange',updateFullscreenButton);
 
 function updateReaderClass(){
  const reader=document.getElementById('reader');

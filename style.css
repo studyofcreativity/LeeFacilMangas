@@ -232,3 +232,94 @@ body.reader-mode header .search-container,
 body.reader-mode header input{
   display:none !important;
 }
+
+
+/* Pantalla completa del lector: cada página se ajusta al área visible sin recortarse. */
+.fullscreen-btn{
+  display:block;
+  width:100%;
+  background:#25252c;
+  color:#ddd;
+  border:1px solid #3a3a43;
+  border-radius:7px;
+  padding:9px 7px;
+  margin:6px 0 0;
+  cursor:pointer;
+  transition:.2s;
+  font-weight:600;
+  font-size:13px;
+}
+.fullscreen-btn:hover{border-color:#e53945;background:#303038;color:#fff}
+
+.chapter-reader-page:fullscreen,
+.chapter-reader-page:-webkit-full-screen{
+  width:100vw;
+  height:100vh;
+  min-height:100vh;
+  overflow-y:auto;
+  overflow-x:hidden;
+  background:#000;
+}
+.chapter-reader-page:fullscreen .chapter-reader-content,
+.chapter-reader-page:-webkit-full-screen .chapter-reader-content{
+  width:100%;
+  max-width:none;
+  min-height:100vh;
+  padding:0;
+  margin:0;
+}
+.chapter-reader-page:fullscreen .back,
+.chapter-reader-page:-webkit-full-screen .back{
+  display:none;
+}
+.chapter-reader-page:fullscreen .reader-meta-top,
+.chapter-reader-page:-webkit-full-screen .reader-meta-top{
+  position:fixed;
+  top:0;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:100;
+  margin:0;
+  background:rgba(15,15,18,.78);
+}
+.chapter-reader-page:fullscreen .reader-wrap,
+.chapter-reader-page:-webkit-full-screen .reader-wrap{
+  width:100vw;
+  min-height:100vh;
+  padding:0;
+  overflow:visible;
+}
+.chapter-reader-page:fullscreen .reader,
+.chapter-reader-page:-webkit-full-screen .reader{
+  width:100vw !important;
+  min-width:0 !important;
+  margin:0;
+  gap:0;
+}
+.chapter-reader-page:fullscreen .reader img,
+.chapter-reader-page:-webkit-full-screen .reader img{
+  width:auto;
+  height:auto;
+  max-width:100vw;
+  max-height:100vh;
+  object-fit:contain;
+  margin:0 auto;
+  background:#000;
+}
+.chapter-reader-page:fullscreen .chapter-bottom-nav,
+.chapter-reader-page:-webkit-full-screen .chapter-bottom-nav{
+  margin:0 auto;
+}
+.chapter-reader-page:fullscreen .reader-toolbar,
+.chapter-reader-page:-webkit-full-screen .reader-toolbar{
+  z-index:120;
+}
+
+@media(max-width:600px){
+  .toolbar-fullscreen{width:100%}
+  .fullscreen-btn{font-size:11px;padding:8px 5px}
+  .chapter-reader-page:fullscreen .reader-meta-top,
+  .chapter-reader-page:-webkit-full-screen .reader-meta-top{
+    width:calc(100% - 110px);
+  }
+}
