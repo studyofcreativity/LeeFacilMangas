@@ -85,37 +85,37 @@ async function openChapter(mid,tid,cid,tomo,cap){
  }
 
  app.innerHTML=`
- <button class="back" onclick="openTomo('${mid}','${tid}',${tomo})">← Volver al tomo</button>
-
- <div class="reader-header">
-   <h2 class="reader-title">Tomo ${tomo} / Capítulo ${cap}</h2>
-
-   <div class="reader-settings">
-
-     <div class="setting-group">
-       <span class="settings-label">Tamaño:</span>
+ <div class="chapter-reader-page">
+   <aside class="reader-toolbar">
+     <div class="toolbar-title">Lectura</div>
+     <div class="toolbar-section">
+       <div class="toolbar-label">Tamaño</div>
        <button class="size-btn ${readerSize==='chico'?'active':''}" onclick="setReaderSize('chico')">Chico</button>
        <button class="size-btn ${readerSize==='normal'?'active':''}" onclick="setReaderSize('normal')">Normal</button>
        <button class="size-btn ${readerSize==='grande'?'active':''}" onclick="setReaderSize('grande')">Grande</button>
        <button class="size-btn ${readerSize==='muy-grande'?'active':''}" onclick="setReaderSize('muy-grande')">Muy grande</button>
      </div>
-
-     <div class="setting-group width-group">
-       <span class="settings-label width-label">Ancho de página:</span>
-       <button title="Página más estrecha" class="width-btn ${readerWidth==='estrecho'?'active':''}" onclick="setReaderWidth('estrecho')">Estrecho</button>
-       <button title="Ancho normal" class="width-btn ${readerWidth==='normal'?'active':''}" onclick="setReaderWidth('normal')">Normal</button>
-       <button title="Página más ancha" class="width-btn ${readerWidth==='gordo'?'active':''}" onclick="setReaderWidth('gordo')">Gordo</button>
-       <button title="Página mucho más ancha" class="width-btn ${readerWidth==='muy-gordo'?'active':''}" onclick="setReaderWidth('muy-gordo')">Muy gordo</button>
+     <div class="toolbar-section">
+       <div class="toolbar-label">Ancho</div>
+       <button class="width-btn ${readerWidth==='estrecho'?'active':''}" onclick="setReaderWidth('estrecho')">Estrecho</button>
+       <button class="width-btn ${readerWidth==='normal'?'active':''}" onclick="setReaderWidth('normal')">Normal</button>
+       <button class="width-btn ${readerWidth==='gordo'?'active':''}" onclick="setReaderWidth('gordo')">Gordo</button>
+       <button class="width-btn ${readerWidth==='muy-gordo'?'active':''}" onclick="setReaderWidth('muy-gordo')">Muy gordo</button>
      </div>
+   </aside>
 
-   </div>
- </div>
-
- <div class="reader-wrap">
-   <div id="reader" class="reader size-${readerSize} width-${readerWidth}">
-   ${(pages||[]).map(p=>`
-     <img loading="lazy" src="${p.imagen_url}" alt="Página ${p.numero}">
-   `).join('')||'<div class="empty">Este capítulo no tiene páginas.</div>'}
+   <div class="chapter-reader-content">
+     <button class="back" onclick="openTomo('${mid}','${tid}',${tomo})">← Volver al tomo</button>
+     <div class="reader-header">
+       <h2 class="reader-title">Tomo ${tomo} / Capítulo ${cap}</h2>
+     </div>
+     <div class="reader-wrap">
+       <div id="reader" class="reader size-${readerSize} width-${readerWidth}">
+       ${(pages||[]).map(p=>`
+         <img loading="lazy" src="${p.imagen_url}" alt="Página ${p.numero}">
+       `).join('')||'<div class="empty">Este capítulo no tiene páginas.</div>'}
+       </div>
+     </div>
    </div>
  </div>`;
 
