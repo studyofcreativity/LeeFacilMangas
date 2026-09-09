@@ -1,5 +1,7 @@
 let mangas=[];
+let readerSize=localStorage.getItem('lfm_reader_size') || 'normal';
 const app=document.getElementById('app');
+
 async function loadMangas(){
  app.innerHTML='<div class="loading">Cargando mangas...</div>';
  const {data,error}=await supabaseClient.from('mangas').select('*').order('nombre');
@@ -12,20 +14,48 @@ function renderHome(list){
 }
 function filterMangas(){const q=document.getElementById('search').value.toLowerCase();renderHome(mangas.filter(m=>m.nombre.toLowerCase().includes(q)))}
 function goHome(){history.pushState({},'',location.pathname);document.getElementById('search').value='';renderHome(mangas)}
+
 async function openManga(id){
  const {data:m}=await supabaseClient.from('mangas').select('*').eq('id',id).single();
  const {data:ts}=await supabaseClient.from('tomos').select('*').eq('manga_id',id).order('numero');
  app.innerHTML=`<button class="back" onclick="goHome()">← Inicio</button><h1>${escapeHtml(m.nombre)}</h1>${m.descripcion?'<p>'+escapeHtml(m.descripcion)+'</p>':''}<h2>Tomos</h2><div class="tomos">${(ts||[]).map(t=>`<div class="tomo" onclick="openTomo('${id}','${t.id}',${t.numero})">Tomo ${t.numero}</div>`).join('')||'<div class="empty">Sin tomos todavía.</div>'}</div>`;
 }
+
 async function openTomo(mid,tid,num){
  const {data:cs}=await supabaseClient.from('capitulos').select('*').eq('tomo_id',tid).order('numero');
  app.innerHTML=`<button class="back" onclick="openManga('${mid}')">← Volver al manga</button><h1>Tomo ${num}</h1><div class="chapters">${(cs||[]).map(c=>`<div class="chapter" onclick="openChapter('${mid}','${tid}','${c.id}',${num},${c.numero})">Capítulo ${c.numero}</div>`).join('')||'<div class="empty">Sin capítulos todavía.</div>'}</div>`;
 }
+
 async function openChapter(mid,tid,cid,tomo,cap){
  app.innerHTML='<div class="loading">Cargando capítulo...</div>';
  const {data:pages,error}=await supabaseClient.from('paginas').select('*').eq('capitulo_id',cid).order('numero');
  if(error){app.innerHTML='<div class="empty">Error al cargar.</div>';return}
- app.innerHTML=`<button class="back" onclick="openTomo('${mid}','${tid}',${tomo})">← Volver al tomo</button><h2 class="reader-title">Tomo ${tomo} / Capítulo ${cap}</h2><div class="reader">${(pages||[]).map(p=>`<img loading="lazy" src="${p.imagen_url}" alt="Página ${p.numero}">`).join('')||'<div class="empty">Este capítulo no tiene páginas.</div>'}</div>`;
+ app.innerHTML=`
+ <button class="back" onclick="openTomo('${mid}','${tid}',${tomo})">← Volver al tomo</button>
+ <div class="reader-header">
+   <h2 class="reader-title">Tomo ${tomo} / Capítulo ${cap}</h2>
+   <div class="reader-settings">
+     <span class="settings-label">Tamaño de lectura:</span>
+     <button class="size-btn ${readerSize==='chico'?'active':''}" onclick="setReaderSize('chico')">Chico</button>
+     <button class="size-btn ${readerSize==='normal'?'active':''}" onclick="setReaderSize('normal')">Normal</button>
+     <button class="size-btn ${readerSize==='grande'?'active':''}" onclick="setReaderSize('grande')">Grande</button>
+     <button class="size-btn ${readerSize==='muy-grande'?'active':''}" onclick="setReaderSize('muy-grande')">Muy grande</button>
+   </div>
+ </div>
+ <div class="reader-wrap"><div id="reader" class="reader size-${readerSize}">
+ ${(pages||[]).map(p=>`<img loading="lazy" src="${p.imagen_url}" alt="Página ${p.numero}">`).join('')||'<div class="empty">Este capítulo no tiene páginas.</div>'}
+ </div></div>`;
  window.scrollTo(0,0);
+}
+
+function setReaderSize(size){
+ readerSize=size;
+ localStorage.setItem('lfm_reader_size',size);
+ const reader=document.getElementById('reader');
+ if(reader)reader.className='reader size-'+size;
+ document.querySelectorAll('.size-btn').forEach(btn=>btn.classList.remove('active'));
+ const map={chico:0,normal:1,grande:2,'muy-grande':3};
+ const buttons=[...document.querySelectorAll('.size-btn')];
+ if(buttons[map[size]])buttons[map[size]].classList.add('active');
 }
 loadMangas();

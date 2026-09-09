@@ -1,11 +1,11 @@
-SUBE A GITHUB SOLAMENTE LOS ARCHIVOS DE ESTA CARPETA.
+LEE FACIL MANGAS - VERSION PUBLICA ACTUALIZADA
 
-No subas private.html ni ADMIN-PRIVADO.
+NUEVA FUNCION DEL LECTOR:
+- Chico
+- Normal
+- Grande
+- Muy grande
 
-ANTES:
-1. Ejecuta supabase_setup.sql desde la carpeta ADMIN-PRIVADO en Supabase SQL Editor.
-2. En Storage crea un bucket llamado: mangas
-3. Márcalo como PUBLIC.
-4. Sube index.html, app.js, style.css y config.js a tu repositorio GitHub Pages.
+Cada lector puede elegir su tamaño y la preferencia se guarda automáticamente en su navegador.
 
-NOTA: config.js contiene la URL y clave pública anon de Supabase. Eso es normal para aplicaciones frontend, pero la seguridad real debe estar protegida mediante RLS/Auth.
+Sube todos los archivos de esta carpeta a GitHub Pages.
