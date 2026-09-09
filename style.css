@@ -174,3 +174,40 @@ main{padding:35px 5%;max-width:1500px;margin:auto}
  .chapter-counter{font-size:10px}
  .chapter-nav-btn{flex-basis:42px;width:42px;height:42px;font-size:28px}
 }
+
+/* Cabecera superior con manga, tomo y capítulo */
+.reader-meta-top{
+  position:sticky;
+  top:0;
+  z-index:30;
+  width:min(100%, 700px);
+  margin:0 auto 18px;
+  padding:8px 18px;
+  box-sizing:border-box;
+  text-align:center;
+  background:rgba(15,15,18,.94);
+  border:1px solid #2d2d35;
+  border-radius:0 0 10px 10px;
+  box-shadow:0 6px 18px rgba(0,0,0,.22);
+  backdrop-filter:blur(8px);
+}
+.reader-meta-name{
+  font-size:15px;
+  line-height:1.2;
+  font-weight:700;
+  color:#f2f2f2;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.reader-meta-location{
+  margin-top:2px;
+  font-size:12px;
+  line-height:1.2;
+  color:#a9a9b2;
+}
+@media(max-width:600px){
+  .reader-meta-top{width:calc(100% - 110px); padding:7px 10px}
+  .reader-meta-name{font-size:13px}
+  .reader-meta-location{font-size:11px}
+}

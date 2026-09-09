@@ -166,8 +166,9 @@ async function openChapter(mid,tid,cid,tomo,cap){
    <div class="chapter-reader-content">
      <button class="back" onclick="openTomo('${mid}','${tid}',${tomo})">← Volver al tomo</button>
 
-     <div class="reader-header">
-       <h2 class="reader-title">Tomo ${tomo} / Capítulo ${cap}</h2>
+     <div class="reader-header reader-meta-top">
+       <div class="reader-meta-name">${escapeHtml(nav.mangaName)}</div>
+       <div class="reader-meta-location">Tomo ${tomo} · Capítulo ${cap}</div>
      </div>
 
      <button class="reader-side-nav reader-side-prev ${previous?'':'disabled'}"
