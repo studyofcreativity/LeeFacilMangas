@@ -13,3 +13,10 @@ Las preferencias se guardan en el navegador.
 
 IMPORTANTE:
 Si GitHub sigue mostrando la versión anterior, fuerza la actualización del navegador con Ctrl+F5.
+
+
+ACTUALIZACIÓN DEL LECTOR
+- El lector ahora permite ir al capítulo anterior y siguiente del manga.
+- La navegación continúa entre tomos automáticamente.
+- La barra inferior muestra nombre del manga, tomo, capítulo y posición.
+- También hay flechas laterales para cambiar de capítulo.

@@ -70,19 +70,78 @@ async function openTomo(mid,tid,num){
  </div>`;
 }
 
+async function getChapterNavigation(mid, tid, cid, currentTomo, currentCap){
+  const {data:manga} = await supabaseClient
+    .from('mangas')
+    .select('id,nombre')
+    .eq('id',mid)
+    .single();
+
+  const {data:tomos,error:tomosError} = await supabaseClient
+    .from('tomos')
+    .select('id,numero')
+    .eq('manga_id',mid)
+    .order('numero');
+
+  if(tomosError || !tomos){
+    return {mangaName:manga?.nombre || 'Manga', chapters:[], index:-1};
+  }
+
+  const chapters=[];
+  for(const tomo of tomos){
+    const {data:cs} = await supabaseClient
+      .from('capitulos')
+      .select('id,numero')
+      .eq('tomo_id',tomo.id)
+      .order('numero');
+
+    (cs||[]).forEach(c=>{
+      chapters.push({
+        id:c.id,
+        tomoId:tomo.id,
+        tomo:tomo.numero,
+        cap:c.numero
+      });
+    });
+  }
+
+  const index=chapters.findIndex(c=>c.id===cid);
+  return {
+    mangaName:manga?.nombre || 'Manga',
+    chapters,
+    index
+  };
+}
+
+function chapterButton(direction, chapter, label){
+  if(!chapter) return `<button class="chapter-nav-btn disabled" disabled>${direction}</button>`;
+  return `<button class="chapter-nav-btn" onclick="openChapter('${chapter.mangaId}','${chapter.tomoId}','${chapter.id}',${chapter.tomo},${chapter.cap})">${direction}</button>`;
+}
+
 async function openChapter(mid,tid,cid,tomo,cap){
  app.innerHTML='<div class="loading">Cargando capítulo...</div>';
 
- const {data:pages,error}=await supabaseClient
-   .from('paginas')
-   .select('*')
-   .eq('capitulo_id',cid)
-   .order('numero');
+ const [pagesResult, nav] = await Promise.all([
+   supabaseClient
+     .from('paginas')
+     .select('*')
+     .eq('capitulo_id',cid)
+     .order('numero'),
+   getChapterNavigation(mid,tid,cid,tomo,cap)
+ ]);
+
+ const pages=pagesResult.data;
+ const error=pagesResult.error;
 
  if(error){
    app.innerHTML='<div class="empty">Error al cargar.</div>';
    return;
  }
+
+ const index=nav.index;
+ const previous=index>0 ? {...nav.chapters[index-1],mangaId:mid} : null;
+ const next=index>=0 && index<nav.chapters.length-1 ? {...nav.chapters[index+1],mangaId:mid} : null;
+ const totalChapters=nav.chapters.length || 1;
 
  app.innerHTML=`
  <div class="chapter-reader-page">
@@ -106,15 +165,41 @@ async function openChapter(mid,tid,cid,tomo,cap){
 
    <div class="chapter-reader-content">
      <button class="back" onclick="openTomo('${mid}','${tid}',${tomo})">← Volver al tomo</button>
+
      <div class="reader-header">
        <h2 class="reader-title">Tomo ${tomo} / Capítulo ${cap}</h2>
      </div>
+
+     <button class="reader-side-nav reader-side-prev ${previous?'':'disabled'}"
+       ${previous ? `onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"` : 'disabled'}
+       aria-label="Capítulo anterior">‹</button>
+
+     <button class="reader-side-nav reader-side-next ${next?'':'disabled'}"
+       ${next ? `onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"` : 'disabled'}
+       aria-label="Capítulo siguiente">›</button>
+
      <div class="reader-wrap">
        <div id="reader" class="reader size-${readerSize} width-${readerWidth}">
        ${(pages||[]).map(p=>`
          <img loading="lazy" src="${p.imagen_url}" alt="Página ${p.numero}">
        `).join('')||'<div class="empty">Este capítulo no tiene páginas.</div>'}
        </div>
+     </div>
+
+     <div class="chapter-bottom-nav">
+       <button class="chapter-nav-btn ${previous?'':'disabled'}"
+         ${previous ? `onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"` : 'disabled'}
+         aria-label="Capítulo anterior">‹</button>
+
+       <div class="chapter-info">
+         <div class="chapter-manga-name">${escapeHtml(nav.mangaName)}</div>
+         <div class="chapter-location">Tomo ${tomo} · Capítulo ${cap}</div>
+         <div class="chapter-counter">Capítulo ${index>=0?index+1:cap} de ${totalChapters}</div>
+       </div>
+
+       <button class="chapter-nav-btn ${next?'':'disabled'}"
+         ${next ? `onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"` : 'disabled'}
+         aria-label="Capítulo siguiente">›</button>
      </div>
    </div>
  </div>`;
