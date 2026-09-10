@@ -15,10 +15,36 @@ function getMangaTags(m){return Array.isArray(m.tags)?m.tags:[];}
 
 async function loadMangas(){
  app.innerHTML='<div class="loading">Cargando mangas...</div>';
- const {data,error}=await supabaseClient.from('mangas').select('*,manga_etiquetas(etiqueta_id,etiquetas(id,nombre))').order('nombre');
- if(error){app.innerHTML='<div class="empty">Error: '+escapeHtml(error.message)+'</div>';return}
- mangas=(data||[]).map(m=>({...m,tags:(m.manga_etiquetas||[]).map(x=>x.etiquetas).filter(Boolean).sort((a,b)=>a.nombre.localeCompare(b.nombre))}));
- renderHome(mangas);
+ try{
+   const {data,error}=await supabaseClient.from('mangas').select('*').order('nombre');
+   if(error) throw error;
+   const rows=data||[];
+   if(!rows.length){mangas=[];renderHome(mangas);return;}
+   const ids=rows.map(m=>m.id);
+   const {data:links,error:linkError}=await supabaseClient
+     .from('manga_etiquetas')
+     .select('manga_id,etiqueta_id')
+     .in('manga_id',ids);
+   if(linkError) throw linkError;
+   const tagIds=[...new Set((links||[]).map(x=>x.etiqueta_id).filter(Boolean))];
+   let tags=[];
+   if(tagIds.length){
+     const {data:tagRows,error:tagError}=await supabaseClient.from('etiquetas').select('id,nombre').in('id',tagIds);
+     if(tagError) throw tagError;
+     tags=tagRows||[];
+   }
+   const tagMap=new Map(tags.map(t=>[t.id,t]));
+   const byManga=new Map();
+   for(const link of (links||[])){
+     const tag=tagMap.get(link.etiqueta_id);
+     if(tag){if(!byManga.has(link.manga_id))byManga.set(link.manga_id,[]);byManga.get(link.manga_id).push(tag);}
+   }
+   mangas=rows.map(m=>({...m,tags:(byManga.get(m.id)||[]).sort((a,b)=>a.nombre.localeCompare(b.nombre))}));
+   renderHome(mangas);
+ }catch(error){
+   console.error('LeeMangasCross: error cargando mangas',error);
+   app.innerHTML='<div class="empty">No se pudieron cargar los mangas.<br><small>'+escapeHtml(error?.message||'Error desconocido')+'</small><br><button onclick="loadMangas()">↻ Reintentar</button></div>';
+ }
 }
 
 function setChapterViewMode(mode){chapterViewMode=mode==='capitulos'?'capitulos':'tomos';localStorage.setItem('lfm_chapter_view_mode',chapterViewMode);renderHome(mangas);}
@@ -510,3 +536,6 @@ document.addEventListener('touchstart',e=>{if(!bookState||e.touches.length!==1)r
 document.addEventListener('touchend',e=>{if(!bookState||bookState.touchX==null)return;const dx=e.changedTouches[0].clientX-bookState.touchX;bookState.touchX=null;if(Math.abs(dx)>55){if(dx<0)bookNext();else bookPrev();}},{passive:true});
 
 function restoreNormalProgress(mid,tid,cid,pagesLength,target){const p=getProgress(mid);if(!p||p.tomoId!==tid||p.chapterId!==cid)return;const page=Math.max(1,Math.min(p.page||1,pagesLength||1));setTimeout(()=>{const img=target.querySelector(`img[data-page-number="${page}"]`);if(img)img.scrollIntoView({block:'start'});},80);}
+
+
+loadMangas();
