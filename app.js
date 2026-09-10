@@ -174,11 +174,26 @@ async function getChapterNavigation(mid, tid, cid, currentTomo, currentCap){
 }
 
 async function openChapter(mid,tid,cid,tomo,cap){
+ const existingPage=document.querySelector('.chapter-reader-page');
+ const wasReaderOpen=!!existingPage;
+ const wasControlsHidden=readerControlsHidden;
+ 
  document.body.classList.add('reader-mode');
- document.body.classList.remove('reader-controls-hidden');
- readerControlsHidden=false;
- app.innerHTML='<div class="loading">Cargando capítulo...</div>';
-
+ if(!wasReaderOpen){
+   readerControlsHidden=false;
+   document.body.classList.remove('reader-controls-hidden');
+ }
+ 
+ // Important: when changing chapters, keep the existing .chapter-reader-page.
+ // This preserves browser fullscreen automatically instead of replacing the fullscreen element.
+ const pageTarget=existingPage || null;
+ if(pageTarget){
+   const content=pageTarget.querySelector('.chapter-reader-content');
+   if(content) content.innerHTML='<div class="loading">Cargando capítulo...</div>';
+ }else{
+   app.innerHTML='<div class="chapter-reader-page"><div class="chapter-reader-content"><div class="loading">Cargando capítulo...</div></div></div>';
+ }
+ 
  const [pagesResult, nav] = await Promise.all([
    supabaseClient
      .from('paginas')
@@ -187,22 +202,28 @@ async function openChapter(mid,tid,cid,tomo,cap){
      .order('numero'),
    getChapterNavigation(mid,tid,cid,tomo,cap)
  ]);
-
+ 
  const pages=pagesResult.data;
  const error=pagesResult.error;
-
  if(error){
-   app.innerHTML='<div class="empty">Error al cargar.</div>';
+   const target=document.querySelector('.chapter-reader-page');
+   if(target) target.querySelector('.chapter-reader-content').innerHTML='<div class="empty">Error al cargar.</div>';
    return;
  }
-
+ 
  const index=nav.index;
  const previous=index>0 ? {...nav.chapters[index-1],mangaId:mid} : null;
  const next=index>=0 && index<nav.chapters.length-1 ? {...nav.chapters[index+1],mangaId:mid} : null;
  const totalChapters=nav.chapters.length || 1;
-
- app.innerHTML=`
- <div class="chapter-reader-page">
+ 
+ const target=document.querySelector('.chapter-reader-page');
+ if(!target) return;
+ 
+ // Keep the reader controls state when moving to another chapter.
+ readerControlsHidden=wasReaderOpen ? wasControlsHidden : false;
+ document.body.classList.toggle('reader-controls-hidden',readerControlsHidden);
+ 
+ target.innerHTML=`
    <aside class="reader-toolbar">
      <div class="toolbar-title">Lectura</div>
      <div class="toolbar-section">
@@ -223,28 +244,28 @@ async function openChapter(mid,tid,cid,tomo,cap){
        <button id="fullscreenBtn" class="fullscreen-btn" onclick="toggleFullscreen()">⛶ Pantalla completa</button>
      </div>
    </aside>
-
+ 
    <div class="chapter-reader-content">
      <button class="back" onclick="openTomo('${mid}','${tid}',${tomo})">← Volver al tomo</button>
-
+ 
      <div class="reader-header reader-meta-top">
        <div class="reader-meta-title-row">
          <div class="reader-meta-name">${escapeHtml(nav.mangaName)}</div>
-         <button id="reader-eye-toggle" class="reader-eye-toggle" type="button" onclick="toggleReaderControls()" aria-label="Ocultar menú" title="Ocultar menú">
-           <span class="eye-icon eye-open" aria-hidden="true">◉</span>
+         <button id="reader-eye-toggle" class="reader-eye-toggle" type="button" onclick="toggleReaderControls()" aria-label="${readerControlsHidden?'Mostrar menú':'Ocultar menú'}" title="${readerControlsHidden?'Mostrar menú':'Ocultar menú'}">
+           ${readerControlsHidden?eyeClosedIcon():eyeOpenIcon()}
          </button>
        </div>
        <div class="reader-meta-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div>
      </div>
-
+ 
      <button class="reader-side-nav reader-side-prev ${previous?'':'disabled'}"
        ${previous ? `onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"` : 'disabled'}
        aria-label="Capítulo anterior">‹</button>
-
+ 
      <button class="reader-side-nav reader-side-next ${next?'':'disabled'}"
        ${next ? `onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"` : 'disabled'}
        aria-label="Capítulo siguiente">›</button>
-
+ 
      <div class="reader-wrap">
        <div id="reader" class="reader size-${readerSize} width-${readerWidth}">
        ${(pages||[]).map(p=>`
@@ -252,26 +273,77 @@ async function openChapter(mid,tid,cid,tomo,cap){
        `).join('')||'<div class="empty">Este capítulo no tiene páginas.</div>'}
        </div>
      </div>
-
+ 
      <div class="chapter-bottom-nav">
        <button class="chapter-nav-btn ${previous?'':'disabled'}"
          ${previous ? `onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"` : 'disabled'}
          aria-label="Capítulo anterior">‹</button>
-
+ 
        <div class="chapter-info">
          <div class="chapter-manga-name">${escapeHtml(nav.mangaName)}</div>
          <div class="chapter-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div>
          <div class="chapter-counter">Capítulo ${index>=0?index+1:escapeHtml(String(cap))} de ${totalChapters}</div>
        </div>
-
+ 
        <button class="chapter-nav-btn ${next?'':'disabled'}"
          ${next ? `onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"` : 'disabled'}
          aria-label="Capítulo siguiente">›</button>
      </div>
-   </div>
- </div>`;
+ 
+     <div id="chapter-end-prompt" class="chapter-end-prompt" aria-live="polite">
+       <button class="chapter-end-arrow chapter-end-prev ${previous?'':'disabled'}"
+         ${previous ? `onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"` : 'disabled'}
+         aria-label="Capítulo anterior">‹</button>
+       <div class="chapter-end-info">
+         <div class="chapter-end-manga">${escapeHtml(nav.mangaName)}</div>
+         <div class="chapter-end-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div>
+       </div>
+       <button class="chapter-end-arrow chapter-end-next ${next?'':'disabled'}"
+         ${next ? `onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"` : 'disabled'}
+         aria-label="Capítulo siguiente">›</button>
+     </div>
+   </div>`;
+ 
+ updateEyeButton();
+ updateFullscreenButton();
+ setupChapterEndPrompt(target);
+ 
+ // Scroll to the beginning of the new chapter without leaving fullscreen.
+ if(target && (document.fullscreenElement===target || document.webkitFullscreenElement===target)){
+   target.scrollTop=0;
+ }else{
+   window.scrollTo(0,0);
+ }
+}
 
- window.scrollTo(0,0);
+function setupChapterEndPrompt(target){
+ if(!target) return;
+ if(target._endPromptCleanup) target._endPromptCleanup();
+ const prompt=target.querySelector('#chapter-end-prompt');
+ if(!prompt) return;
+ 
+ const isFullscreen=()=>document.fullscreenElement===target || document.webkitFullscreenElement===target;
+ const getScrollMetrics=()=> isFullscreen()
+   ? {top:target.scrollTop,height:target.scrollHeight,view:target.clientHeight}
+   : {top:window.scrollY,height:document.documentElement.scrollHeight,view:window.innerHeight};
+ 
+ const check=()=>{
+   const m=getScrollMetrics();
+   const nearBottom=(m.top+m.view)>=m.height-70;
+   prompt.classList.toggle('show',nearBottom);
+ };
+ const onWindowScroll=()=>{ if(!isFullscreen()) check(); };
+ const onTargetScroll=()=>{ if(isFullscreen()) check(); };
+ window.addEventListener('scroll',onWindowScroll,{passive:true});
+ target.addEventListener('scroll',onTargetScroll,{passive:true});
+ window.addEventListener('resize',check,{passive:true});
+ 
+ target._endPromptCleanup=()=>{
+   window.removeEventListener('scroll',onWindowScroll);
+   target.removeEventListener('scroll',onTargetScroll);
+   window.removeEventListener('resize',check);
+ };
+ check();
 }
 
 function eyeOpenIcon(){

@@ -457,3 +457,88 @@ body.reader-mode.reader-controls-hidden .reader-eye-toggle{
   .chapter-all-item{align-items:flex-start}
   .reader-eye-toggle{width:32px;height:28px;flex-basis:32px}
 }
+
+/* =========================================================
+   AVISO DE FIN DE CAPÍTULO
+   Aparece al llegar al final, también con menú oculto y en pantalla completa.
+   ========================================================= */
+.chapter-end-prompt{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:16px;
+  z-index:150;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:18px;
+  pointer-events:none;
+  opacity:0;
+  transform:translateY(10px);
+  transition:opacity .2s ease, transform .2s ease;
+}
+.chapter-end-prompt.show{
+  opacity:1;
+  transform:translateY(0);
+}
+.chapter-end-info{
+  min-width:180px;
+  max-width:min(360px,55vw);
+  padding:7px 12px;
+  text-align:center;
+  background:rgba(15,15,18,.88);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;
+  box-shadow:0 6px 20px rgba(0,0,0,.35);
+  backdrop-filter:blur(6px);
+}
+.chapter-end-manga{
+  font-size:12px;
+  line-height:1.2;
+  font-weight:700;
+  color:#eee;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.chapter-end-location{
+  margin-top:2px;
+  font-size:10px;
+  line-height:1.2;
+  color:#aaa;
+}
+.chapter-end-arrow{
+  pointer-events:auto;
+  flex:0 0 44px;
+  width:44px;
+  height:44px;
+  border-radius:9px;
+  border:1px solid #3a3a43;
+  background:rgba(21,21,26,.94);
+  color:#fff;
+  font-size:31px;
+  line-height:1;
+  cursor:pointer;
+  box-shadow:0 6px 20px rgba(0,0,0,.35);
+}
+.chapter-end-arrow:hover:not(.disabled){
+  background:#29292e;
+  border-color:#e53945;
+}
+.chapter-end-arrow.disabled{
+  opacity:.25;
+  cursor:not-allowed;
+}
+
+/* El aviso de fin no se oculta cuando el usuario pulsa el ojo. */
+body.reader-mode.reader-controls-hidden .chapter-end-prompt{
+  display:flex !important;
+}
+
+@media(max-width:600px){
+  .chapter-end-prompt{bottom:12px;gap:8px}
+  .chapter-end-info{min-width:0;max-width:52vw;padding:6px 9px}
+  .chapter-end-manga{font-size:11px}
+  .chapter-end-location{font-size:9px}
+  .chapter-end-arrow{flex-basis:40px;width:40px;height:40px;font-size:28px}
+}
