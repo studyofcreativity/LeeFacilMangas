@@ -324,9 +324,77 @@ body.reader-mode header input{
   }
 }
 
-/* LFM DOUBLE CLICK READER CONTROLS */
+
+/* Selector de modo para visualizar los contenidos de un manga */
+.manga-view-switcher{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+  margin:22px 0 24px;
+  padding:12px;
+  background:#15151a;
+  border:1px solid #303038;
+  border-radius:10px;
+}
+.manga-view-label{
+  width:100%;
+  font-size:13px;
+  color:#aaa;
+  font-weight:700;
+  margin-bottom:2px;
+}
+.manga-view-btn{
+  background:#25252c;
+  color:#ddd;
+  border:1px solid #3a3a43;
+  border-radius:8px;
+  padding:10px 14px;
+  cursor:pointer;
+  font-weight:600;
+  transition:.2s;
+}
+.manga-view-btn:hover{border-color:#e53945;background:#303038}
+.manga-view-btn.active{background:#e53945;color:#fff;border-color:#e53945;box-shadow:0 0 0 2px rgba(229,57,69,.18)}
+.chapter-flat{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:15px;
+}
+.chapter-flat small{color:#999;font-size:12px}
+@media(max-width:600px){
+  .manga-view-switcher{display:block}
+  .manga-view-btn{width:100%;margin:4px 0}
+  .chapter-flat{padding:14px}
+}
+
+
+/* LFM READER EYE BUTTON */
+.reader-eye-toggle{
+  display:inline-flex !important;
+  align-items:center;
+  justify-content:center;
+  width:36px;
+  height:32px;
+  margin-left:10px;
+  padding:0;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:8px;
+  background:rgba(255,255,255,.08);
+  color:inherit;
+  font-size:19px;
+  line-height:1;
+  cursor:pointer;
+  vertical-align:middle;
+}
+.reader-eye-toggle:hover{
+  background:rgba(255,255,255,.15);
+}
+
+/* Eye remains visible when the rest of the reader menu is hidden. */
 body.reader-mode.reader-controls-hidden .reader-toolbar,
-body.reader-mode.reader-controls-hidden .reader-top-meta,
+body.reader-mode.reader-controls-hidden .reader-top-meta > *:not(#reader-eye-toggle),
 body.reader-mode.reader-controls-hidden .chapter-nav-side,
 body.reader-mode.reader-controls-hidden .reader-bottom-nav,
 body.reader-mode.reader-controls-hidden .reader-back,
@@ -336,4 +404,17 @@ body.reader-mode.reader-controls-hidden .reader-options,
 body.reader-mode.reader-controls-hidden .reader-size,
 body.reader-mode.reader-controls-hidden .reader-width,
 body.reader-mode.reader-controls-hidden .reader-fullscreen,
-body.reader-mode.reader-controls-hidden .reader-nav { display:none !important; }
+body.reader-mode.reader-controls-hidden .reader-nav{
+  display:none !important;
+}
+
+/* Keep the header container itself so the eye can stay beside the title. */
+body.reader-mode.reader-controls-hidden .reader-top-meta{
+  display:flex !important;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+}
+body.reader-mode.reader-controls-hidden .reader-top-meta #reader-eye-toggle{
+  display:inline-flex !important;
+}

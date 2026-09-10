@@ -1,6 +1,7 @@
 let mangas=[];
 let readerSize=localStorage.getItem('lfm_reader_size') || 'normal';
 let readerWidth=localStorage.getItem('lfm_reader_width') || 'normal';
+let mangaViewMode=localStorage.getItem('lfm_manga_view_mode') || 'tomos';
 
 const app=document.getElementById('app');
 
@@ -44,17 +45,65 @@ async function openManga(id){
  const {data:m}=await supabaseClient.from('mangas').select('*').eq('id',id).single();
  const {data:ts}=await supabaseClient.from('tomos').select('*').eq('manga_id',id).order('numero');
 
+ const modeButtons=`
+   <div class="manga-view-switcher">
+     <div class="manga-view-label">Modo de visualización</div>
+     <button class="manga-view-btn ${mangaViewMode==='tomos'?'active':''}" onclick="setMangaViewMode('tomos','${id}')">Ver dividido en tomos</button>
+     <button class="manga-view-btn ${mangaViewMode==='chapters'?'active':''}" onclick="setMangaViewMode('chapters','${id}')">Ver solo capítulos</button>
+   </div>`;
+
  app.innerHTML=`
  <button class="back" onclick="goHome()">← Inicio</button>
  <h1>${escapeHtml(m.nombre)}</h1>
  ${m.descripcion?'<p>'+escapeHtml(m.descripcion)+'</p>':''}
- <h2>Tomos</h2>
- <div class="tomos">
- ${(ts||[]).map(t=>`
- <div class="tomo" onclick="openTomo('${id}','${t.id}',${t.numero})">
- Tomo ${t.numero}
- </div>`).join('')||'<div class="empty">Sin tomos todavía.</div>'}
- </div>`;
+ ${modeButtons}
+ <div id="manga-content"></div>`;
+
+ if(mangaViewMode==='chapters') await renderMangaOnlyChapters(id,ts||[]);
+ else renderMangaTomos(id,ts||[]);
+}
+
+function setMangaViewMode(mode,id){
+ mangaViewMode=mode;
+ localStorage.setItem('lfm_manga_view_mode',mode);
+ openManga(id);
+}
+
+function renderMangaTomos(id,ts){
+ const content=document.getElementById('manga-content');
+ if(!content) return;
+ content.innerHTML=`
+   <h2>Tomos</h2>
+   <div class="tomos">
+   ${ts.map(t=>`
+   <div class="tomo" onclick="openTomo('${id}','${t.id}',${t.numero})">
+   Tomo ${t.numero}
+   </div>`).join('')||'<div class="empty">Sin tomos todavía.</div>'}
+   </div>`;
+}
+
+async function renderMangaOnlyChapters(id,ts){
+ const content=document.getElementById('manga-content');
+ if(!content) return;
+ content.innerHTML='<div class="loading">Cargando capítulos...</div>';
+
+ const allChapters=[];
+ for(const tomo of ts){
+   const {data:cs,error}=await supabaseClient.from('capitulos').select('*').eq('tomo_id',tomo.id).order('numero');
+   if(error) continue;
+   (cs||[]).forEach(c=>allChapters.push({...c,tomoId:tomo.id,tomoNumero:tomo.numero}));
+ }
+ allChapters.sort((a,b)=>Number(a.tomoNumero)-Number(b.tomoNumero) || Number(a.numero)-Number(b.numero));
+
+ content.innerHTML=`
+   <h2>Capítulos</h2>
+   <div class="chapters">
+   ${allChapters.map(c=>`
+   <div class="chapter chapter-flat" onclick="openChapter('${id}','${c.tomoId}','${c.id}',${c.tomoNumero},${c.numero})">
+     <span>Capítulo ${c.numero}</span>
+     <small>Tomo ${c.tomoNumero}</small>
+   </div>`).join('')||'<div class="empty">Sin capítulos todavía.</div>'}
+   </div>`;
 }
 
 async function openTomo(mid,tid,num){
@@ -269,18 +318,76 @@ function setReaderWidth(width){
 }
 
 loadMangas();
-/* LFM DOUBLE CLICK READER CONTROLS */
+
+
+/* LFM READER EYE BUTTON */
 (function(){
-  let hidden=false;
-  document.addEventListener('dblclick',function(e){
-    if(!document.body.classList.contains('reader-mode')) return;
-    const tag=(e.target&&e.target.tagName||'').toLowerCase();
-    if(['input','textarea','select','button','a'].includes(tag)) return;
-    hidden=!hidden;
-    document.body.classList.toggle('reader-controls-hidden',hidden);
+  let readerControlsHidden = false;
+
+  function isReaderOpen(){
+    return document.body && document.body.classList.contains('reader-mode');
+  }
+
+  function setReaderControlsHidden(hidden){
+    readerControlsHidden = !!hidden;
+    document.body.classList.toggle('reader-controls-hidden', readerControlsHidden);
+
+    const btn = document.getElementById('reader-eye-toggle');
+    if(btn){
+      btn.textContent = readerControlsHidden ? '🙈' : '👁';
+      btn.setAttribute('aria-label', readerControlsHidden ? 'Mostrar menú' : 'Ocultar menú');
+      btn.setAttribute('title', readerControlsHidden ? 'Mostrar menú' : 'Ocultar menú');
+    }
+  }
+
+  window.lfmToggleReaderControls = function(){
+    if(!isReaderOpen()) return;
+    setReaderControlsHidden(!readerControlsHidden);
+  };
+
+  // The eye is inserted next to the manga title in the reader header.
+  function ensureEyeButton(){
+    if(!isReaderOpen()) return;
+    if(document.getElementById('reader-eye-toggle')) return;
+
+    const header = document.querySelector('.reader-top-meta');
+    if(!header) return;
+
+    const title =
+      header.querySelector('.reader-manga-name') ||
+      header.querySelector('.manga-name') ||
+      header.querySelector('h1') ||
+      header.querySelector('h2') ||
+      header.firstElementChild;
+
+    if(!title) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'reader-eye-toggle';
+    btn.type = 'button';
+    btn.className = 'reader-eye-toggle';
+    btn.textContent = '👁';
+    btn.setAttribute('aria-label', 'Ocultar menú');
+    btn.setAttribute('title', 'Ocultar menú');
+    btn.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      window.lfmToggleReaderControls();
+    });
+
+    title.insertAdjacentElement('afterend', btn);
+  }
+
+  const observer = new MutationObserver(function(){
+    if(!isReaderOpen()){
+      readerControlsHidden = false;
+      document.body.classList.remove('reader-controls-hidden');
+      return;
+    }
+    ensureEyeButton();
   });
-  const ob=new MutationObserver(function(){
-    if(!document.body.classList.contains('reader-mode')){ hidden=false; document.body.classList.remove('reader-controls-hidden'); }
-  });
-  ob.observe(document.body,{attributes:true,attributeFilter:['class']});
+
+  observer.observe(document.body, {subtree:true, childList:true, attributes:true, attributeFilter:['class']});
+  document.addEventListener('DOMContentLoaded', ensureEyeButton);
 })();
+
