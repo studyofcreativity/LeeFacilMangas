@@ -20,7 +20,15 @@ function escapeHtml(s=''){
 }
 
 function renderHome(list){
- app.innerHTML='<h1>Todos los mangas</h1>'+(list.length
+ const homeModeMenu=`
+ <div class="home-view-menu">
+   <div class="home-view-menu-title">Modo de visualización de capítulos</div>
+   <div class="home-view-menu-buttons">
+     <button class="manga-view-btn ${mangaViewMode==='tomos'?'active':''}" onclick="setGlobalMangaViewMode('tomos')">Ver dividido en tomos</button>
+     <button class="manga-view-btn ${mangaViewMode==='chapters'?'active':''}" onclick="setGlobalMangaViewMode('chapters')">Ver solo capítulos</button>
+   </div>
+ </div>`;
+ app.innerHTML='<h1>Todos los mangas</h1>'+homeModeMenu+(list.length
  ?'<div class="grid">'+list.map(m=>`
  <article class="card" onclick="openManga('${m.id}')">
  <img src="${m.portada_url||''}" alt="">
@@ -37,6 +45,12 @@ function filterMangas(){
 function goHome(){
  history.pushState({},'',location.pathname);
  document.getElementById('search').value='';
+ renderHome(mangas);
+}
+
+function setGlobalMangaViewMode(mode){
+ mangaViewMode=mode;
+ localStorage.setItem('lfm_manga_view_mode',mode);
  renderHome(mangas);
 }
 
@@ -171,6 +185,7 @@ function chapterButton(direction, chapter, label){
 
 async function openChapter(mid,tid,cid,tomo,cap){
  document.body.classList.add('reader-mode');
+ document.body.classList.remove('reader-controls-hidden');
  app.innerHTML='<div class="loading">Cargando capítulo...</div>';
 
  const [pagesResult, nav] = await Promise.all([
@@ -222,7 +237,10 @@ async function openChapter(mid,tid,cid,tomo,cap){
      <button class="back" onclick="openTomo('${mid}','${tid}',${tomo})">← Volver al tomo</button>
 
      <div class="reader-header reader-meta-top">
-       <div class="reader-meta-name">${escapeHtml(nav.mangaName)}</div>
+       <div class="reader-meta-title-row">
+         <div class="reader-meta-name">${escapeHtml(nav.mangaName)}</div>
+         <button id="reader-eye-toggle" class="reader-eye-toggle" type="button" onclick="toggleReaderControls()" aria-label="Ocultar menú" title="Ocultar menú">👁</button>
+       </div>
        <div class="reader-meta-location">Tomo ${tomo} · Capítulo ${cap}</div>
      </div>
 
@@ -320,74 +338,15 @@ function setReaderWidth(width){
 loadMangas();
 
 
-/* LFM READER EYE BUTTON */
-(function(){
-  let readerControlsHidden = false;
 
-  function isReaderOpen(){
-    return document.body && document.body.classList.contains('reader-mode');
-  }
-
-  function setReaderControlsHidden(hidden){
-    readerControlsHidden = !!hidden;
-    document.body.classList.toggle('reader-controls-hidden', readerControlsHidden);
-
-    const btn = document.getElementById('reader-eye-toggle');
-    if(btn){
-      btn.textContent = readerControlsHidden ? '🙈' : '👁';
-      btn.setAttribute('aria-label', readerControlsHidden ? 'Mostrar menú' : 'Ocultar menú');
-      btn.setAttribute('title', readerControlsHidden ? 'Mostrar menú' : 'Ocultar menú');
-    }
-  }
-
-  window.lfmToggleReaderControls = function(){
-    if(!isReaderOpen()) return;
-    setReaderControlsHidden(!readerControlsHidden);
-  };
-
-  // The eye is inserted next to the manga title in the reader header.
-  function ensureEyeButton(){
-    if(!isReaderOpen()) return;
-    if(document.getElementById('reader-eye-toggle')) return;
-
-    const header = document.querySelector('.reader-top-meta');
-    if(!header) return;
-
-    const title =
-      header.querySelector('.reader-manga-name') ||
-      header.querySelector('.manga-name') ||
-      header.querySelector('h1') ||
-      header.querySelector('h2') ||
-      header.firstElementChild;
-
-    if(!title) return;
-
-    const btn = document.createElement('button');
-    btn.id = 'reader-eye-toggle';
-    btn.type = 'button';
-    btn.className = 'reader-eye-toggle';
-    btn.textContent = '👁';
-    btn.setAttribute('aria-label', 'Ocultar menú');
-    btn.setAttribute('title', 'Ocultar menú');
-    btn.addEventListener('click', function(e){
-      e.preventDefault();
-      e.stopPropagation();
-      window.lfmToggleReaderControls();
-    });
-
-    title.insertAdjacentElement('afterend', btn);
-  }
-
-  const observer = new MutationObserver(function(){
-    if(!isReaderOpen()){
-      readerControlsHidden = false;
-      document.body.classList.remove('reader-controls-hidden');
-      return;
-    }
-    ensureEyeButton();
-  });
-
-  observer.observe(document.body, {subtree:true, childList:true, attributes:true, attributeFilter:['class']});
-  document.addEventListener('DOMContentLoaded', ensureEyeButton);
-})();
+function toggleReaderControls(){
+ const hidden=!document.body.classList.contains('reader-controls-hidden');
+ document.body.classList.toggle('reader-controls-hidden',hidden);
+ const btn=document.getElementById('reader-eye-toggle');
+ if(btn){
+   btn.textContent=hidden?'🙈':'👁';
+   btn.setAttribute('aria-label',hidden?'Mostrar menú':'Ocultar menú');
+   btn.setAttribute('title',hidden?'Mostrar menú':'Ocultar menú');
+ }
+}
 
