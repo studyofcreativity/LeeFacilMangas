@@ -124,114 +124,389 @@ function setReaderSize(s){readerSize=s;localStorage.setItem('lfm_reader_size',s)
 function setReaderWidth(w){readerWidth=w;localStorage.setItem('lfm_reader_width',w);updateReaderClass();document.querySelectorAll('.width-btn').forEach(b=>b.classList.remove('active'));const map={estrecho:0,normal:1,gordo:2,'muy-gordo':3},buttons=[...document.querySelectorAll('.width-btn')];if(buttons[map[w]])buttons[map[w]].classList.add('active');}
 
 // ---------------- MODO LIBRO ----------------
+// El Libro mantiene un único índice sobre las páginas reales del tomo.
+// La precarga solo crea Image() en memoria y nunca añade páginas al DOM.
 async function fetchTomoBook(mid,tid){
- const {data:t,error:te}=await supabaseClient.from('tomos').select('*').eq('id',tid).single();if(te||!t)throw te||new Error('Tomo no encontrado');
- const {data:cs,error:ce}=await supabaseClient.from('capitulos').select('id,numero').eq('tomo_id',tid).order('numero');if(ce)throw ce;
- const chapters=[];for(const c of (cs||[])){const {data:ps,error:pe}=await supabaseClient.from('paginas').select('id,numero,imagen_url').eq('capitulo_id',c.id).order('numero');if(pe)throw pe;chapters.push({id:c.id,numero:c.numero,pages:ps||[]});}
- return {tomo:t,chapters};
+  const {data:t,error:te}=await supabaseClient
+    .from('tomos').select('*').eq('id',tid).single();
+  if(te||!t) throw te||new Error('Tomo no encontrado');
+
+  const {data:cs,error:ce}=await supabaseClient
+    .from('capitulos').select('id,numero').eq('tomo_id',tid).order('numero');
+  if(ce) throw ce;
+
+  const chapters=[];
+  for(const c of (cs||[])){
+    const {data:ps,error:pe}=await supabaseClient
+      .from('paginas')
+      .select('id,numero,imagen_url')
+      .eq('capitulo_id',c.id)
+      .order('numero',{ascending:true});
+    if(pe) throw pe;
+
+    // El orden es exclusivamente el número guardado en public.paginas.
+    // No se usa el orden accidental de Storage.
+    const pages=(ps||[])
+      .slice()
+      .sort((a,b)=>Number(a.numero)-Number(b.numero))
+      .map((p,i)=>({
+        id:p.id,
+        numero:p.numero,
+        src:p.imagen_url,
+        page:i+1
+      }));
+
+    chapters.push({id:c.id,numero:c.numero,pages});
+  }
+  return {tomo:t,chapters};
 }
-function flattenBook(book){const items=[{type:'cover',src:book.tomo.portada_url||'',tomo:book.tomo.numero}];book.chapters.forEach(c=>c.pages.forEach((p,i)=>items.push({type:'page',src:p.imagen_url,chapterId:c.id,chapter:c.numero,page:i+1,numero:p.numero})));return items;}
-function bookProgressPosition(book,mid,tid){const p=getProgress(mid);if(!p||p.tomoId!==tid)return 0;let pos=1;for(const c of book.chapters){if(c.id===p.chapterId)return pos+Math.max(0,(p.page||1)-1);pos+=c.pages.length;}return 0;}
+
+function flattenBook(book){
+  const items=[{type:'cover',src:book.tomo.portada_url||'',tomo:book.tomo.numero}];
+  for(const c of book.chapters){
+    for(const p of c.pages){
+      items.push({
+        type:'page',
+        src:p.src,
+        id:p.id,
+        chapterId:c.id,
+        chapter:c.numero,
+        page:p.page,
+        numero:p.numero
+      });
+    }
+  }
+  return items;
+}
+
+function getBookItem(state,index){
+  return state?.items?.[index]||null;
+}
+
+function bookIsDesktopSpread(state){
+  const item=getBookItem(state,state.index);
+  return !!(window.innerWidth>=900 && item && item.type==='page');
+}
+
+function chapterFirstIndex(items,chapterId){
+  return items.findIndex(x=>x.type==='page'&&x.chapterId===chapterId);
+}
+
+function bookProgressPosition(book,mid,tid){
+  const p=getProgress(mid);
+  if(!p||p.tomoId!==tid) return 0;
+
+  let index=1;
+  for(const c of book.chapters){
+    if(c.id===p.chapterId){
+      const page=Math.max(1,Math.min(Number(p.page)||1,c.pages.length||1));
+      return index+page-1;
+    }
+    index+=c.pages.length;
+  }
+  return 0;
+}
+
 async function openBookTomo(mid,tid){
- const book=await fetchTomoBook(mid,tid);
- const start=bookProgressPosition(book,mid,tid);
- openBookUI(mid,tid,book,start,true);
+  try{
+    const book=await fetchTomoBook(mid,tid);
+    const saved=getProgress(mid);
+    const start=saved&&saved.tomoId===tid ? bookProgressPosition(book,mid,tid) : 0;
+    await openBookUI(mid,tid,book,start,true);
+  }catch(e){
+    console.error(e);
+    app.innerHTML='<div class="empty">No se pudo cargar el libro.</div>';
+  }
 }
+
 async function openBookChapter(mid,tid,cid,tomo,cap){
- try{const book=await fetchTomoBook(mid,tid);const pos=bookProgressPosition(book,mid,tid);let start=pos;const chapterStart=book.chapters.findIndex(c=>c.id===cid);if(!getProgress(mid)&&chapterStart>=0)start=1+book.chapters.slice(0,chapterStart).reduce((n,c)=>n+c.pages.length,0);openBookUI(mid,tid,book,start,false);}catch(e){app.innerHTML='<div class="empty">No se pudo cargar el libro.</div>';}}
-function bookIndexToChapter(book,index){if(index<=0)return null;let n=index-1;for(const c of book.chapters){if(n<c.pages.length)return {chapter:c,page:n+1};n-=c.pages.length;}return null;}
-function bookCanGoPrev(state){return state.index>0;}
-function bookCanGoNext(state){return state.index<state.items.length-1;}
-function renderBookPage(state,slot){const item=state.items[slot];if(!item)return '<div class="book-blank"></div>';if(item.type==='cover')return `<div class="book-sheet book-cover-sheet"><img src="${escapeHtml(item.src)}" alt="Portada del Tomo ${escapeHtml(String(state.book.tomo.numero))}"><div class="book-cover-fallback">Tomo ${escapeHtml(String(state.book.tomo.numero))}</div></div>`;return `<div class="book-sheet"><img loading="eager" src="${escapeHtml(item.src)}" alt="Página ${escapeHtml(String(item.numero))}"></div>`;}
+  try{
+    const book=await fetchTomoBook(mid,tid);
+    const items=flattenBook(book);
+    const start=chapterFirstIndex(items,cid);
+    await openBookUI(mid,tid,book,start>0?start:0,false);
+  }catch(e){
+    console.error(e);
+    app.innerHTML='<div class="empty">No se pudo cargar el libro.</div>';
+  }
+}
+
+function bookIndexToChapter(book,index){
+  if(index<=0) return null;
+  const item=book?flattenBook(book)[index]:null;
+  if(!item||item.type!=='page') return null;
+  return {
+    chapter:{id:item.chapterId,numero:item.chapter},
+    page:item.page,
+    numero:item.numero,
+    chapterId:item.chapterId
+  };
+}
+
+function bookCanGoPrev(state){return !!state && (state.index>0 || state.navTomos.findIndex(t=>t.id===state.tid)>0);}
+function bookCanGoNext(state){return !!state && (state.index<state.items.length-1 || state.navTomos.findIndex(t=>t.id===state.tid)<state.navTomos.length-1);}
+
+function renderBookPage(item,state,side){
+  if(!item){
+    return '<div class="book-sheet book-blank" aria-hidden="true"></div>';
+  }
+  if(item.type==='cover'){
+    if(!item.src) return '<div class="book-sheet book-cover-sheet" aria-label="Portada sin imagen"></div>';
+    return `<div class="book-sheet book-cover-sheet"><img decoding="async" loading="eager" src="${escapeHtml(item.src)}" alt="Portada del tomo"></div>`;
+  }
+  return `<div class="book-sheet book-page-sheet"><img decoding="async" loading="eager" src="${escapeHtml(item.src)}" alt="Página ${escapeHtml(String(item.page))}" data-book-page-id="${escapeHtml(item.id)}"></div>`;
+}
+
+function bookSpreadForState(state){
+  const item=getBookItem(state,state.index);
+  if(!item) return {desktop:false,left:null,right:null};
+  if(item.type==='cover') return {desktop:false,left:null,right:item};
+  const desktop=window.innerWidth>=900;
+  if(!desktop) return {desktop:false,left:null,right:item};
+
+  // Una pareja N/N+1 jamás cruza de capítulo.
+  const next=getBookItem(state,state.index+1);
+  const right=item.page%2===1 ? item : getBookItem(state,state.index-1);
+  const left=(right && next && next.type==='page' && next.chapterId===right.chapterId && next.page===right.page+1) ? next : null;
+  return {desktop:true,left,right};
+}
+
 function renderBook(){
- const s=bookState;if(!s)return;
- const two=s.index>0&&s.index+1<s.items.length&&window.innerWidth>=900;
- const leftSlot=two?s.index:s.index;
- const rightSlot=two?s.index+1:-1;
- const nextVisible=s.index<s.items.length-1 || s.navTomos.findIndex(t=>t.id===s.tid)<s.navTomos.length-1;
- const prevVisible=s.index>0 || s.navTomos.findIndex(t=>t.id===s.tid)>0;
- const meta=s.index===0?`Portada · Tomo ${s.book.tomo.numero}`:(()=>{const cp=bookIndexToChapter(s.book,s.index);return cp?`Tomo ${s.book.tomo.numero} · Capítulo ${cp.chapter.numero} · Página ${cp.page}`:`Tomo ${s.book.tomo.numero}`})();
- const reader=document.getElementById('book-reader');if(!reader)return;
- reader.innerHTML=`<div class="book-topbar"><button class="book-eye" onclick="toggleBookControls()">${s.controlsHidden?eyeClosedIcon():eyeOpenIcon()}</button><div class="book-title">${escapeHtml(s.mangaName)}<small>${escapeHtml(meta)}</small></div><button class="book-full" onclick="toggleBookFullscreen()">⛶</button></div><div class="book-stage ${two?'book-two-pages':''}"><button class="book-arrow book-arrow-left ${nextVisible?'':'disabled'}" onclick="bookNext()" ${nextVisible?'':'disabled'}>‹</button><div class="book-spread ${s.animDirection==='next'?'page-flip-next':''} ${s.animDirection==='prev'?'page-flip-prev':''}">${renderBookPage(s,leftSlot)}${two?renderBookPage(s,rightSlot):''}</div><button class="book-arrow book-arrow-right ${prevVisible?'':'disabled'}" onclick="bookPrev()" ${prevVisible?'':'disabled'}>›</button></div><div class="book-bottom"><span>${escapeHtml(meta)}</span><span>${s.index+1} / ${s.items.length}</span></div>${s.chapterFlash?`<div class="book-chapter-flash">Capítulo ${escapeHtml(String(bookIndexToChapter(s.book,s.index)?.chapter?.numero??''))}</div>`:''}`;
- reader.classList.toggle('book-controls-hidden',s.controlsHidden);document.body.classList.toggle('book-controls-hidden',s.controlsHidden);
- s.animDirection='';
+  const s=bookState;if(!s) return;
+
+  // Al volver de móvil a escritorio, normalizamos un cursor que haya quedado
+  // en una página par para que la página impar vuelva a quedar a la derecha.
+  const current=getBookItem(s,s.index);
+  if(window.innerWidth>=900 && current?.type==='page' && current.page%2===0){
+    const prev=getBookItem(s,s.index-1);
+    if(prev?.type==='page' && prev.chapterId===current.chapterId) s.index--;
+  }
+
+  const spread=bookSpreadForState(s);
+  const currentRight=spread.right;
+  const chapterMeta=currentRight?.type==='page'
+    ? `Tomo ${s.book.tomo.numero} · Capítulo ${currentRight.chapter} · Página ${currentRight.page}${spread.left?`-${spread.left.page}`:''}`
+    : `Portada`;
+  const tomoMeta=`Tomo ${s.book.tomo.numero}`;
+  const chapterId=currentRight?.type==='page'?currentRight.chapterId:null;
+
+  const nextVisible=bookCanGoNext(s);
+  const prevVisible=bookCanGoPrev(s);
+  const reader=document.getElementById('book-reader');
+  if(!reader) return;
+
+  const nextClass=s.animDirection==='next'?'book-flip-next':s.animDirection==='prev'?'book-flip-prev':'';
+
+  reader.innerHTML=`
+    <div class="book-topbar">
+      <button class="book-eye" onclick="toggleBookControls()">${s.controlsHidden?eyeClosedIcon():eyeOpenIcon()}</button>
+      <div class="book-title">${escapeHtml(s.mangaName)}<small>${escapeHtml(chapterMeta)}</small></div>
+      <button class="book-full" onclick="toggleBookFullscreen()">⛶</button>
+    </div>
+    <div class="book-stage ${spread.desktop?'book-two-pages':''}">
+      <button class="book-arrow book-arrow-left ${nextVisible?'':'disabled'}" onclick="bookNext()" ${nextVisible?'':'disabled'} aria-label="Página siguiente">‹</button>
+      <div class="book-spread ${nextClass}">
+        ${spread.desktop?renderBookPage(spread.left,s,'left'):''}
+        ${renderBookPage(spread.right,s,'right')}
+      </div>
+      <button class="book-arrow book-arrow-right ${prevVisible?'':'disabled'}" onclick="bookPrev()" ${prevVisible?'':'disabled'} aria-label="Página anterior">›</button>
+    </div>
+    <div class="book-bottom"><span>${escapeHtml(tomoMeta)}</span><span>${s.index===0?'Portada':escapeHtml(chapterMeta)}</span></div>
+    ${s.chapterFlash?`<div class="book-chapter-flash">Capítulo ${escapeHtml(String(currentRight?.chapter??''))}</div>`:''}`;
+
+  reader.classList.toggle('book-controls-hidden',s.controlsHidden);
+  document.body.classList.toggle('book-controls-hidden',s.controlsHidden);
+
+  const direction=s.animDirection;
+  s.animDirection='';
+  if(direction){
+    window.setTimeout(()=>{
+      if(bookState===s) preloadBookNeighbors();
+    },40);
+  }
 }
+
+function setBookIndex(index,direction){
+  const s=bookState;if(!s)return false;
+  const next=Math.max(0,Math.min(index,s.items.length-1));
+  if(next===s.index)return false;
+  s.index=next;
+  s.animDirection=direction;
+  s.chapterFlash=(bookIndexToChapter(s.book,s.index)?.chapterId||null)!==(bookIndexToChapter(s.book,s.index-(direction==='next'?2:1))?.chapterId||null);
+  saveBookProgress();
+  renderBook();
+  if(s.chapterFlash){
+    window.setTimeout(()=>{if(bookState===s){s.chapterFlash=false;renderBook();}},700);
+  }
+  return true;
+}
+
 async function bookNext(){
- if(!bookState)return;
- if(bookCanGoNext(bookState)){
-   const before=bookIndexToChapter(bookState.book,bookState.index)?.chapter?.id;
-   bookState.index++;
-   const after=bookIndexToChapter(bookState.book,bookState.index)?.chapter?.id;
-   bookState.animDirection='next';
-   bookState.chapterFlash=before&&after&&before!==after;
-   saveBookProgress();renderBook();preloadBookNeighbors();
-   if(bookState.chapterFlash)setTimeout(()=>{if(bookState) {bookState.chapterFlash=false;renderBook()}},900);
-   return;
- }
- const i=bookState.navTomos.findIndex(t=>t.id===bookState.tid);
- if(i>=0&&i<bookState.navTomos.length-1){
-   await openBookTomo(bookState.mid,bookState.navTomos[i+1].id);
- }
+  const s=bookState;if(!s)return;
+  if(s.index===0){
+    if(s.items.length>1){
+      setBookIndex(1,'next');
+    }else{
+      const i=s.navTomos.findIndex(t=>t.id===s.tid);
+      if(i>=0&&i<s.navTomos.length-1) await openBookTomo(s.mid,s.navTomos[i+1].id);
+    }
+    return;
+  }
+
+  const item=getBookItem(s,s.index);
+  if(!item)return;
+
+  if(window.innerWidth>=900){
+    // Si el cursor se encuentra en una página par por una transición de layout,
+    // primero se coloca en la pareja correcta.
+    if(item.page%2===0){
+      setBookIndex(s.index+1,'next');
+      return;
+    }
+    const afterPair=getBookItem(s,s.index+2);
+    if(afterPair?.type==='page' && afterPair.chapterId===item.chapterId){
+      setBookIndex(s.index+2,'next');
+      return;
+    }
+    // Fin del capítulo -> primera página del siguiente capítulo.
+    const nextChapterIndex=s.items.findIndex((x,i)=>i>s.index && x.type==='page' && x.chapterId!==item.chapterId);
+    if(nextChapterIndex>0){
+      setBookIndex(nextChapterIndex,'next');
+      return;
+    }
+  }else{
+    if(s.index<s.items.length-1){
+      setBookIndex(s.index+1,'next');
+      return;
+    }
+  }
+
+  const i=s.navTomos.findIndex(t=>t.id===s.tid);
+  if(i>=0&&i<s.navTomos.length-1) await openBookTomo(s.mid,s.navTomos[i+1].id);
 }
+
 async function bookPrev(){
- if(!bookState)return;
- if(bookCanGoPrev(bookState)){
-   const before=bookIndexToChapter(bookState.book,bookState.index)?.chapter?.id;
-   bookState.index--;
-   const after=bookIndexToChapter(bookState.book,bookState.index)?.chapter?.id;
-   bookState.animDirection='prev';
-   bookState.chapterFlash=before&&after&&before!==after;
-   saveBookProgress();renderBook();preloadBookNeighbors();
-   if(bookState.chapterFlash)setTimeout(()=>{if(bookState){bookState.chapterFlash=false;renderBook()}},900);
-   return;
- }
- const i=bookState.navTomos.findIndex(t=>t.id===bookState.tid);
- if(i>0){
-   await openBookTomo(bookState.mid,bookState.navTomos[i-1].id);
- }
+  const s=bookState;if(!s)return;
+  if(s.index===0){
+    const i=s.navTomos.findIndex(t=>t.id===s.tid);
+    if(i>0) await openBookTomo(s.mid,s.navTomos[i-1].id);
+    return;
+  }
+
+  const item=getBookItem(s,s.index);
+  if(!item)return;
+
+  if(window.innerWidth>=900){
+    if(item.page%2===0){
+      setBookIndex(Math.max(1,s.index-1),'prev');
+      return;
+    }
+    if(item.page>2){
+      setBookIndex(s.index-2,'prev');
+      return;
+    }
+    // Página 1 de un capítulo: vuelve a la portada si es el primer capítulo,
+    // o a la última pareja del capítulo anterior.
+    const prevItem=getBookItem(s,s.index-1);
+    if(prevItem?.type==='page'&&prevItem.chapterId!==item.chapterId){
+      let i=s.index-1;
+      while(i>1){
+        const x=getBookItem(s,i),before=getBookItem(s,i-1);
+        if(x?.type==='page'&&before?.type==='page'&&x.chapterId!==item.chapterId) break;
+        i--;
+      }
+      setBookIndex(Math.max(1,s.index-1),'prev');
+      return;
+    }
+    setBookIndex(0,'prev');
+    return;
+  }
+
+  setBookIndex(s.index-1,'prev');
 }
-function saveBookProgress(){const s=bookState,cp=bookIndexToChapter(s.book,s.index);if(cp)saveProgress(s.mid,s.tid,cp.chapter.id,cp.page);}
-function preloadBookNeighbors(){const s=bookState;[s.index-1,s.index+1,s.index+2].forEach(i=>{const x=s.items[i];if(x?.src){const im=new Image();im.src=x.src;}})}
+
+function saveBookProgress(){
+  const s=bookState;if(!s)return;
+  const cp=bookIndexToChapter(s.book,s.index);
+  if(cp) saveProgress(s.mid,s.tid,cp.chapter.id,cp.page);
+}
+
+function preloadBookNeighbors(){
+  const s=bookState;if(!s)return;
+  const indices=new Set([s.index-2,s.index-1,s.index+1,s.index+2]);
+  for(const i of indices){
+    const x=s.items[i];
+    if(x?.type==='page'&&x.src){
+      const im=new Image();
+      im.decoding='async';
+      im.src=x.src;
+    }
+  }
+}
+
 function openNextTomoFromBook(){const s=bookState;if(!s)return;const ti=s.navTomos.findIndex(t=>t.id===s.tid);if(ti>=0&&ti<s.navTomos.length-1)openBookTomo(s.mid,s.navTomos[ti+1].id);}
 function openPrevTomoFromBook(){const s=bookState;if(!s)return;const ti=s.navTomos.findIndex(t=>t.id===s.tid);if(ti>0)openBookTomo(s.mid,s.navTomos[ti-1].id);}
+
 async function openBookUI(mid,tid,book,start,fromTomo){
- const oldPage=document.querySelector('.book-reader-page');
- const wasFullscreen=!!(oldPage&&(document.fullscreenElement===oldPage||document.webkitFullscreenElement===oldPage));
- const oldHidden=bookState?.controlsHidden||false;
- const {data:m}=await supabaseClient.from('mangas').select('id,nombre').eq('id',mid).single();const {data:tomos}=await supabaseClient.from('tomos').select('id,numero,portada_url').eq('manga_id',mid).order('numero');
- const items=flattenBook(book);
- bookState={mid,tid,book,items,index:Math.min(Math.max(start,0),Math.max(items.length-1,0)),controlsHidden:oldHidden,mangaName:m?.nombre||'Manga',navTomos:tomos||[],chapterFlash:false};
- document.body.classList.add('reader-mode','book-mode');document.body.classList.toggle('book-controls-hidden',oldHidden);
- if(oldPage){oldPage.innerHTML='<div id="book-reader"></div>';}else{app.innerHTML='<div class="chapter-reader-page book-reader-page"><div id="book-reader"></div></div>';}
- renderBook();preloadBookNeighbors();
- const page=document.querySelector('.book-reader-page');
- if(wasFullscreen&&page&&!document.fullscreenElement){try{if(page.requestFullscreen)await page.requestFullscreen();else if(page.webkitRequestFullscreen)page.webkitRequestFullscreen();}catch(e){console.warn(e)}}
- try{if(document.fullscreenElement&&screen.orientation?.lock)await screen.orientation.lock('landscape');}catch(e){}
+  const oldPage=document.querySelector('.book-reader-page');
+  const wasFullscreen=!!(oldPage&&(document.fullscreenElement===oldPage||document.webkitFullscreenElement===oldPage));
+  const oldHidden=bookState?.controlsHidden||false;
+  const {data:m}=await supabaseClient.from('mangas').select('id,nombre').eq('id',mid).single();
+  const {data:tomos}=await supabaseClient.from('tomos').select('id,numero,portada_url').eq('manga_id',mid).order('numero');
+  const items=flattenBook(book);
+  bookState={
+    mid,tid,book,items,
+    index:Math.max(0,Math.min(Number(start)||0,Math.max(items.length-1,0))),
+    controlsHidden:oldHidden,
+    mangaName:m?.nombre||'Manga',
+    navTomos:tomos||[],
+    chapterFlash:false,
+    animDirection:'',
+    touchX:null
+  };
+
+  // En escritorio, nunca arrancamos en una página par como derecha.
+  const initial=getBookItem(bookState,bookState.index);
+  const prev=getBookItem(bookState,bookState.index-1);
+  if(window.innerWidth>=900 && initial?.type==='page' && initial.page%2===0 && prev?.type==='page'&&prev.chapterId===initial.chapterId){
+    bookState.index--;
+  }
+
+  document.body.classList.add('reader-mode','book-mode');
+  document.body.classList.toggle('book-controls-hidden',oldHidden);
+  if(oldPage){
+    oldPage.innerHTML='<div id="book-reader"></div>';
+  }else{
+    app.innerHTML='<div class="chapter-reader-page book-reader-page"><div id="book-reader"></div></div>';
+  }
+
+  renderBook();
+  preloadBookNeighbors();
+
+  const page=document.querySelector('.book-reader-page');
+  if(wasFullscreen&&page&&!document.fullscreenElement){
+    try{
+      if(page.requestFullscreen) await page.requestFullscreen();
+      else if(page.webkitRequestFullscreen) page.webkitRequestFullscreen();
+    }catch(e){console.warn(e)}
+  }
+  try{
+    if(document.fullscreenElement&&screen.orientation?.lock) await screen.orientation.lock('landscape');
+  }catch(e){}
 }
+
 function toggleBookControls(){if(!bookState)return;bookState.controlsHidden=!bookState.controlsHidden;renderBook();}
 async function toggleBookFullscreen(){const p=document.querySelector('.book-reader-page');if(!p)return;try{if(!document.fullscreenElement){if(p.requestFullscreen)await p.requestFullscreen();else if(p.webkitRequestFullscreen)p.webkitRequestFullscreen();}else if(document.exitFullscreen)await document.exitFullscreen();}catch(e){console.error(e)}}
-document.addEventListener('keydown',e=>{if(!bookState)return;if(e.key==='ArrowLeft')bookNext();else if(e.key==='ArrowRight')bookPrev();else if(e.key==='Escape'&&document.fullscreenElement)document.exitFullscreen?.();});
+
+document.addEventListener('keydown',e=>{
+  if(!bookState)return;
+  if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
+  if(e.key==='ArrowLeft'){e.preventDefault();bookNext();}
+  else if(e.key==='ArrowRight'){e.preventDefault();bookPrev();}
+  else if(e.key==='Escape'&&document.fullscreenElement)document.exitFullscreen?.();
+});
 
 document.addEventListener('touchstart',e=>{if(!bookState||e.touches.length!==1)return;bookState.touchX=e.touches[0].clientX;},{passive:true});
 document.addEventListener('touchend',e=>{if(!bookState||bookState.touchX==null)return;const dx=e.changedTouches[0].clientX-bookState.touchX;bookState.touchX=null;if(Math.abs(dx)>55){if(dx<0)bookNext();else bookPrev();}},{passive:true});
 
 function restoreNormalProgress(mid,tid,cid,pagesLength,target){const p=getProgress(mid);if(!p||p.tomoId!==tid||p.chapterId!==cid)return;const page=Math.max(1,Math.min(p.page||1,pagesLength||1));setTimeout(()=>{const img=target.querySelector(`img[data-page-number="${page}"]`);if(img)img.scrollIntoView({block:'start'});},80);}
-
-function setupNormalProgress(target,mid,tid,cid){
- if(target._progressCleanup)target._progressCleanup();
- const save=()=>{
-  const imgs=[...target.querySelectorAll('.reader img[data-page-number]')];
-  if(!imgs.length)return;
-  const isFs=document.fullscreenElement===target||document.webkitFullscreenElement===target;
-  const scrollTop=isFs?target.scrollTop:window.scrollY;
-  let best=null,bestY=-Infinity;
-  imgs.forEach(img=>{const r=img.getBoundingClientRect();const y=(isFs?target.scrollTop:window.scrollY)+r.top;if(y<=scrollTop+90&&y>bestY){best=img;bestY=y}});
-  if(best)saveProgress(mid,tid,cid,Number(best.dataset.pageNumber)||1);
- };
- const handler=()=>requestAnimationFrame(save);
- window.addEventListener('scroll',handler,{passive:true});
- target.addEventListener('scroll',handler,{passive:true});
- target._progressCleanup=()=>{window.removeEventListener('scroll',handler);target.removeEventListener('scroll',handler)};
-}
-window.addEventListener('scroll',()=>{if(!bookState)return;const cp=bookIndexToChapter(bookState.book,bookState.index);if(cp)saveProgress(bookState.mid,bookState.tid,cp.chapter.id,cp.page);},{passive:true});
-loadMangas();

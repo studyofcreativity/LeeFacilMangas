@@ -586,16 +586,18 @@ body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .cha
 .book-title small{display:block;color:#aaa;font-weight:400;font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .book-eye,.book-full{width:38px;height:34px;flex:0 0 38px;background:#25252c;color:#fff;border:1px solid #3a3a43;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .book-eye{position:absolute;left:14px}.book-full{position:absolute;right:14px}
-.book-stage{position:relative;flex:1;min-height:calc(100vh - 96px);display:flex;align-items:center;justify-content:center;gap:14px;padding:20px 70px;perspective:1400px}
-.book-spread{width:min(100%,1000px);height:calc(100vh - 150px);display:flex;align-items:center;justify-content:center;gap:0;transform-style:preserve-3d}
-.book-sheet{height:100%;width:min(48%,600px);display:flex;align-items:center;justify-content:center;background:#111;box-shadow:0 18px 50px rgba(0,0,0,.45);overflow:hidden;position:relative}
-.book-sheet img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;display:block}
+.book-stage{position:relative;flex:1;min-height:calc(100vh - 96px);display:flex;align-items:center;justify-content:center;gap:22px;padding:18px 78px;perspective:1800px;overflow:hidden}
+.book-spread{width:min(100%,1220px);height:calc(100vh - 142px);display:flex;align-items:stretch;justify-content:center;gap:0;transform-style:preserve-3d;position:relative;filter:drop-shadow(0 18px 38px rgba(0,0,0,.35))}
+.book-sheet{height:100%;width:min(100%,720px);display:flex;align-items:center;justify-content:center;background:#111;position:relative;overflow:hidden;min-width:0}
 .book-two-pages .book-sheet{width:50%}
-.book-cover-sheet{background:#18181c}
-.book-cover-sheet img{width:100%;height:100%;object-fit:contain}
-.book-cover-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#777;font-size:22px;pointer-events:none}
-.book-arrow{width:54px;height:64px;flex:0 0 54px;border:1px solid #3a3a43;border-radius:10px;background:rgba(21,21,26,.92);color:#fff;font-size:42px;line-height:1;cursor:pointer;z-index:20}
-.book-arrow:hover:not(.disabled){background:#29292e;border-color:#e53945}
+.book-page-sheet:first-child{box-shadow:inset -10px 0 24px rgba(0,0,0,.18)}
+.book-page-sheet:last-child{box-shadow:inset 10px 0 24px rgba(0,0,0,.18)}
+.book-sheet img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+.book-cover-sheet{background:#141418;box-shadow:0 14px 40px rgba(0,0,0,.44)}
+.book-cover-sheet img{display:block;width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain}
+.book-blank{background:linear-gradient(90deg,#0c0c0f,#17171b 55%,#0c0c0f)}
+.book-arrow{width:54px;height:64px;flex:0 0 54px;border:1px solid #3a3a43;border-radius:10px;background:rgba(21,21,26,.92);color:#fff;font-size:42px;line-height:1;cursor:pointer;z-index:20;transition:transform .16s ease,background .16s ease,border-color .16s ease}
+.book-arrow:hover:not(.disabled){background:#29292e;border-color:#e53945;transform:scale(1.03)}
 .book-arrow.disabled{opacity:.25;cursor:not-allowed}
 .book-bottom{height:38px;flex:0 0 38px;display:flex;justify-content:center;gap:25px;align-items:center;color:#888;font-size:10px;background:#101014;border-top:1px solid #29292e}
 .book-controls-hidden .book-topbar{background:transparent;border:0;pointer-events:none}
@@ -604,30 +606,35 @@ body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .cha
 .book-controls-hidden .book-stage{min-height:100vh}
 .book-controls-hidden .book-arrow{opacity:.9}
 .book-reader-page:fullscreen,.book-reader-page:-webkit-full-screen{width:100vw;height:100vh;background:#000}
-.book-reader-page:fullscreen .book-stage,.book-reader-page:-webkit-full-screen .book-stage{min-height:calc(100vh - 96px)}
-.book-reader-page:fullscreen .book-spread,.book-reader-page:-webkit-full-screen .book-spread{height:calc(100vh - 120px);max-width:1200px}
+.book-reader-page:fullscreen .book-stage,.book-reader-page:-webkit-full-screen .book-stage{min-height:calc(100vh - 96px);padding-top:12px;padding-bottom:12px}
+.book-reader-page:fullscreen .book-spread,.book-reader-page:-webkit-full-screen .book-spread{height:calc(100vh - 120px);max-width:1400px}
+
+.book-flip-next{animation:lmcBookFlipNext .30s cubic-bezier(.22,.72,.26,1) both;transform-origin:right center}
+.book-flip-prev{animation:lmcBookFlipPrev .30s cubic-bezier(.22,.72,.26,1) both;transform-origin:left center}
+.book-flip-next::after,.book-flip-prev::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent 58%,rgba(0,0,0,.18) 78%,rgba(255,255,255,.10));opacity:0}
+.book-flip-next::after{animation:lmcBookShadowNext .30s ease both}
+.book-flip-prev::after{animation:lmcBookShadowPrev .30s ease both;background:linear-gradient(90deg,rgba(0,0,0,.18),transparent 42%,rgba(255,255,255,.08))}
+@keyframes lmcBookFlipNext{from{transform:rotateY(-10deg) translateX(18px) scale(.985);opacity:.84}to{transform:rotateY(0) translateX(0) scale(1);opacity:1}}
+@keyframes lmcBookFlipPrev{from{transform:rotateY(10deg) translateX(-18px) scale(.985);opacity:.84}to{transform:rotateY(0) translateX(0) scale(1);opacity:1}}
+@keyframes lmcBookShadowNext{0%,100%{opacity:0}35%{opacity:1}}
+@keyframes lmcBookShadowPrev{0%,100%{opacity:0}35%{opacity:1}}
+
+.book-chapter-flash{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:180;padding:7px 13px;border-radius:8px;background:rgba(10,10,12,.84);border:1px solid rgba(255,255,255,.13);font-size:12px;color:#ddd;pointer-events:none;animation:lmcChapterFlash .7s ease both}
+@keyframes lmcChapterFlash{0%{opacity:0;transform:translate(-50%,-45%)}18%,78%{opacity:1;transform:translate(-50%,-50%)}100%{opacity:0;transform:translate(-50%,-55%)}}
+
 @media(max-width:899px){
- .book-stage{padding:10px 52px;min-height:calc(100vh - 86px)}
- .book-spread{height:calc(100vh - 125px);width:100%}
- .book-sheet{width:100%;max-width:700px}
+ .book-stage{padding:10px 54px;min-height:calc(100vh - 86px);gap:0}
+ .book-spread{height:calc(100vh - 122px);width:100%}
+ .book-sheet{width:100%;max-width:820px}
  .book-arrow{position:absolute;width:44px;height:52px;flex-basis:44px;font-size:34px}
  .book-arrow-left{left:8px}.book-arrow-right{right:8px}
 }
 @media(max-width:600px){
- .view-mode-options{gap:7px}.view-mode-btn{flex-basis:100%}
- .manga-detail-head{display:block}.tomo-page-head{align-items:flex-start}.tomo-cover-large{width:90px;height:135px}
- .book-topbar{height:52px;flex-basis:52px}.book-title{max-width:60vw;font-size:13px}.book-title small{font-size:9px}
+ .book-topbar{height:52px;flex-basis:52px}
+ .book-title{max-width:60vw;font-size:13px}.book-title small{font-size:9px}
  .book-stage{padding:4px 48px}.book-spread{height:calc(100vh - 100px)}
  .book-arrow{width:40px;height:48px;font-size:31px}.book-arrow-left{left:5px}.book-arrow-right{right:5px}
  .book-sheet{max-width:100%;height:100%}
  .book-bottom{display:none}
 }
-
-.book-spread{transform-style:preserve-3d;backface-visibility:hidden}
-.page-flip-next{animation:lfmBookNext .26s ease both}
-.page-flip-prev{animation:lfmBookPrev .26s ease both}
-@keyframes lfmBookNext{from{transform:rotateY(-8deg) scale(.985);opacity:.72}to{transform:rotateY(0) scale(1);opacity:1}}
-@keyframes lfmBookPrev{from{transform:rotateY(8deg) scale(.985);opacity:.72}to{transform:rotateY(0) scale(1);opacity:1}}
-.book-chapter-flash{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:180;padding:7px 13px;border-radius:8px;background:rgba(10,10,12,.84);border:1px solid rgba(255,255,255,.13);font-size:12px;color:#ddd;pointer-events:none;animation:lfmChapterFlash .9s ease both}
-@keyframes lfmChapterFlash{0%{opacity:0;transform:translate(-50%,-45%)}18%,78%{opacity:1;transform:translate(-50%,-50%)}100%{opacity:0;transform:translate(-50%,-55%)}}
-@media (prefers-reduced-motion:reduce){.page-flip-next,.page-flip-prev,.book-chapter-flash{animation:none}}
+@media (prefers-reduced-motion:reduce){.book-flip-next,.book-flip-prev,.book-chapter-flash{animation:none}}
