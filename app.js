@@ -331,6 +331,7 @@ function setupChapterEndPrompt(target){
    const m=getScrollMetrics();
    const nearBottom=(m.top+m.view)>=m.height-70;
    prompt.classList.toggle('show',nearBottom);
+   target.classList.toggle('chapter-at-end',nearBottom);
  };
  const onWindowScroll=()=>{ if(!isFullscreen()) check(); };
  const onTargetScroll=()=>{ if(isFullscreen()) check(); };

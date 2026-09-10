@@ -542,3 +542,16 @@ body.reader-mode.reader-controls-hidden .chapter-end-prompt{
   .chapter-end-location{font-size:9px}
   .chapter-end-arrow{flex-basis:40px;width:40px;height:40px;font-size:28px}
 }
+
+/* Al llegar al final, mostrar SOLO el aviso final de capítulo.
+   Se ocultan las navegaciones normales para evitar botones duplicados. */
+.chapter-reader-page:has(.chapter-end-prompt.show) .reader-side-nav,
+.chapter-reader-page:has(.chapter-end-prompt.show) .chapter-bottom-nav{
+  display:none !important;
+}
+
+/* En navegadores sin :has(), el JS añade esta clase al lector. */
+.chapter-reader-page.chapter-at-end .reader-side-nav,
+.chapter-reader-page.chapter-at-end .chapter-bottom-nav{
+  display:none !important;
+}
