@@ -564,3 +564,70 @@ body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .rea
 body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .chapter-bottom-nav{
   display:none !important;
 }
+
+
+/* ===== Etiquetas y modos nuevos ===== */
+.view-mode-subtitle{margin-top:18px;padding-top:14px;border-top:1px solid #303038}
+.manga-tags{display:flex;flex-wrap:wrap;gap:5px;padding:0 10px 12px;justify-content:center}
+.tag{font-size:11px;padding:4px 7px;border-radius:999px;background:#29292e;border:1px solid #3b3b43;color:#bbb;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.manga-detail-head{display:flex;gap:20px;align-items:flex-start}
+.tomo{position:relative;min-height:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;overflow:hidden}
+.tomo-cover{width:70px;height:92px;object-fit:cover;border-radius:6px;background:#222}
+.tomo-page-head{display:flex;align-items:center;gap:18px;margin-bottom:18px}
+.tomo-cover-large{width:120px;height:180px;object-fit:cover;border-radius:8px;border:1px solid #333}
+.book-open-btn,.reader-book-switch{background:#25252c;color:#eee;border:1px solid #3a3a43;border-radius:7px;padding:9px 12px;cursor:pointer;font-weight:600}
+.book-open-btn:hover,.reader-book-switch:hover{border-color:#e53945;background:#303038}
+
+/* ===== Modo Libro ===== */
+.book-reader-page{min-height:100vh;background:#080809;color:#eee;overflow:hidden}
+#book-reader{min-height:100vh;display:flex;flex-direction:column}
+.book-topbar{height:58px;flex:0 0 58px;display:flex;align-items:center;justify-content:center;gap:12px;background:rgba(20,20,24,.96);border-bottom:1px solid #303038;z-index:100;padding:0 14px}
+.book-title{font-weight:700;text-align:center;min-width:0;max-width:70vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.book-title small{display:block;color:#aaa;font-weight:400;font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.book-eye,.book-full{width:38px;height:34px;flex:0 0 38px;background:#25252c;color:#fff;border:1px solid #3a3a43;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.book-eye{position:absolute;left:14px}.book-full{position:absolute;right:14px}
+.book-stage{position:relative;flex:1;min-height:calc(100vh - 96px);display:flex;align-items:center;justify-content:center;gap:14px;padding:20px 70px;perspective:1400px}
+.book-spread{width:min(100%,1000px);height:calc(100vh - 150px);display:flex;align-items:center;justify-content:center;gap:0;transform-style:preserve-3d}
+.book-sheet{height:100%;width:min(48%,600px);display:flex;align-items:center;justify-content:center;background:#111;box-shadow:0 18px 50px rgba(0,0,0,.45);overflow:hidden;position:relative}
+.book-sheet img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;display:block}
+.book-two-pages .book-sheet{width:50%}
+.book-cover-sheet{background:#18181c}
+.book-cover-sheet img{width:100%;height:100%;object-fit:contain}
+.book-cover-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#777;font-size:22px;pointer-events:none}
+.book-arrow{width:54px;height:64px;flex:0 0 54px;border:1px solid #3a3a43;border-radius:10px;background:rgba(21,21,26,.92);color:#fff;font-size:42px;line-height:1;cursor:pointer;z-index:20}
+.book-arrow:hover:not(.disabled){background:#29292e;border-color:#e53945}
+.book-arrow.disabled{opacity:.25;cursor:not-allowed}
+.book-bottom{height:38px;flex:0 0 38px;display:flex;justify-content:center;gap:25px;align-items:center;color:#888;font-size:10px;background:#101014;border-top:1px solid #29292e}
+.book-controls-hidden .book-topbar{background:transparent;border:0;pointer-events:none}
+.book-controls-hidden .book-title,.book-controls-hidden .book-full,.book-controls-hidden .book-bottom{display:none}
+.book-controls-hidden .book-eye{display:flex!important;pointer-events:auto}
+.book-controls-hidden .book-stage{min-height:100vh}
+.book-controls-hidden .book-arrow{opacity:.9}
+.book-reader-page:fullscreen,.book-reader-page:-webkit-full-screen{width:100vw;height:100vh;background:#000}
+.book-reader-page:fullscreen .book-stage,.book-reader-page:-webkit-full-screen .book-stage{min-height:calc(100vh - 96px)}
+.book-reader-page:fullscreen .book-spread,.book-reader-page:-webkit-full-screen .book-spread{height:calc(100vh - 120px);max-width:1200px}
+@media(max-width:899px){
+ .book-stage{padding:10px 52px;min-height:calc(100vh - 86px)}
+ .book-spread{height:calc(100vh - 125px);width:100%}
+ .book-sheet{width:100%;max-width:700px}
+ .book-arrow{position:absolute;width:44px;height:52px;flex-basis:44px;font-size:34px}
+ .book-arrow-left{left:8px}.book-arrow-right{right:8px}
+}
+@media(max-width:600px){
+ .view-mode-options{gap:7px}.view-mode-btn{flex-basis:100%}
+ .manga-detail-head{display:block}.tomo-page-head{align-items:flex-start}.tomo-cover-large{width:90px;height:135px}
+ .book-topbar{height:52px;flex-basis:52px}.book-title{max-width:60vw;font-size:13px}.book-title small{font-size:9px}
+ .book-stage{padding:4px 48px}.book-spread{height:calc(100vh - 100px)}
+ .book-arrow{width:40px;height:48px;font-size:31px}.book-arrow-left{left:5px}.book-arrow-right{right:5px}
+ .book-sheet{max-width:100%;height:100%}
+ .book-bottom{display:none}
+}
+
+.book-spread{transform-style:preserve-3d;backface-visibility:hidden}
+.page-flip-next{animation:lfmBookNext .26s ease both}
+.page-flip-prev{animation:lfmBookPrev .26s ease both}
+@keyframes lfmBookNext{from{transform:rotateY(-8deg) scale(.985);opacity:.72}to{transform:rotateY(0) scale(1);opacity:1}}
+@keyframes lfmBookPrev{from{transform:rotateY(8deg) scale(.985);opacity:.72}to{transform:rotateY(0) scale(1);opacity:1}}
+.book-chapter-flash{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:180;padding:7px 13px;border-radius:8px;background:rgba(10,10,12,.84);border:1px solid rgba(255,255,255,.13);font-size:12px;color:#ddd;pointer-events:none;animation:lfmChapterFlash .9s ease both}
+@keyframes lfmChapterFlash{0%{opacity:0;transform:translate(-50%,-45%)}18%,78%{opacity:1;transform:translate(-50%,-50%)}100%{opacity:0;transform:translate(-50%,-55%)}}
+@media (prefers-reduced-motion:reduce){.page-flip-next,.page-flip-prev,.book-chapter-flash{animation:none}}
