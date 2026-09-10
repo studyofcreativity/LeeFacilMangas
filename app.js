@@ -330,17 +330,18 @@ function setupChapterEndPrompt(target){
  const check=()=>{
    const m=getScrollMetrics();
    const nearBottom=(m.top+m.view)>=m.height-70;
-   prompt.classList.toggle('show',nearBottom);
-   target.classList.toggle('chapter-at-end',nearBottom);
+   const showEndPrompt=nearBottom && readerControlsHidden;
+   prompt.classList.toggle('show',showEndPrompt);
+   target.classList.toggle('chapter-at-end',showEndPrompt);
 
    // At the end of a chapter there must be ONLY the end-of-chapter navigation.
    // Hide the normal side/bottom navigation explicitly as well as through CSS,
    // so it cannot appear duplicated in browsers with different CSS support.
    const sideNavs=target.querySelectorAll('.reader-side-nav');
    const bottomNav=target.querySelector('.chapter-bottom-nav');
-   sideNavs.forEach(el=>{ el.style.display=nearBottom?'none':''; });
-   if(bottomNav) bottomNav.style.display=nearBottom?'none':'';
-   prompt.style.display=nearBottom?'flex':'';
+   sideNavs.forEach(el=>{ el.style.display=showEndPrompt?'none':''; });
+   if(bottomNav) bottomNav.style.display=showEndPrompt?'none':'';
+   prompt.style.display=showEndPrompt?'flex':'';
  };
  const onWindowScroll=()=>{ if(!isFullscreen()) check(); };
  const onTargetScroll=()=>{ if(isFullscreen()) check(); };
@@ -348,6 +349,7 @@ function setupChapterEndPrompt(target){
  target.addEventListener('scroll',onTargetScroll,{passive:true});
  window.addEventListener('resize',check,{passive:true});
  
+ target._checkChapterEnd=check;
  target._endPromptCleanup=()=>{
    window.removeEventListener('scroll',onWindowScroll);
    target.removeEventListener('scroll',onTargetScroll);
@@ -377,6 +379,9 @@ function toggleReaderControls(){
  readerControlsHidden=!readerControlsHidden;
  document.body.classList.toggle('reader-controls-hidden',readerControlsHidden);
  updateEyeButton();
+ // Si estamos al final, el aviso final aparece SOLO con el menú oculto.
+ const target=document.querySelector('.chapter-reader-page');
+ if(target && typeof target._checkChapterEnd === 'function') target._checkChapterEnd();
 }
 
 async function toggleFullscreen(){

@@ -530,9 +530,9 @@ body.reader-mode.reader-controls-hidden .reader-eye-toggle{
   cursor:not-allowed;
 }
 
-/* El aviso de fin no se oculta cuando el usuario pulsa el ojo. */
-body.reader-mode.reader-controls-hidden .chapter-end-prompt{
-  display:flex !important;
+/* El aviso final solo puede aparecer con el menú oculto; JS controla su estado al llegar al final. */
+body.reader-mode:not(.reader-controls-hidden) .chapter-end-prompt{
+  display:none !important;
 }
 
 @media(max-width:600px){
@@ -545,22 +545,22 @@ body.reader-mode.reader-controls-hidden .chapter-end-prompt{
 
 /* Al llegar al final, mostrar SOLO el aviso final de capítulo.
    Se ocultan las navegaciones normales para evitar botones duplicados. */
-.chapter-reader-page.chapter-at-end .reader-side-nav,
-.chapter-reader-page.chapter-at-end .chapter-bottom-nav{
+body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .reader-side-nav,
+body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .chapter-bottom-nav{
   display:none !important;
 }
-.chapter-reader-page.chapter-at-end .chapter-end-prompt.show{
+body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .chapter-end-prompt.show{
   display:flex !important;
 }
 
 
-.chapter-reader-page:has(.chapter-end-prompt.show) .reader-side-nav,
-.chapter-reader-page:has(.chapter-end-prompt.show) .chapter-bottom-nav{
+body.reader-mode.reader-controls-hidden .chapter-reader-page:has(.chapter-end-prompt.show) .reader-side-nav,
+body.reader-mode.reader-controls-hidden .chapter-reader-page:has(.chapter-end-prompt.show) .chapter-bottom-nav{
   display:none !important;
 }
 
 /* En navegadores sin :has(), el JS añade esta clase al lector. */
-.chapter-reader-page.chapter-at-end .reader-side-nav,
-.chapter-reader-page.chapter-at-end .chapter-bottom-nav{
+body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .reader-side-nav,
+body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .chapter-bottom-nav{
   display:none !important;
 }
