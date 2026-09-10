@@ -8,6 +8,40 @@ let readerControlsHidden=false;
 let bookState=null;
 const app=document.getElementById('app');
 
+function waitMs(ms){return new Promise(r=>setTimeout(r,ms));}
+
+function bookReaderEl(){return document.getElementById('book-reader');}
+
+function clearBookAnimClasses(){
+  const reader=bookReaderEl();
+  if(!reader)return;
+  reader.classList.remove(
+    'book-anim-open','book-anim-close',
+    'book-anim-tomo-exit-next','book-anim-tomo-exit-prev',
+    'book-anim-tomo-enter-next','book-anim-tomo-enter-prev',
+    'book-anim-tomo-open'
+  );
+  document.querySelector('.book-stage')?.classList.remove('book-animating');
+}
+
+async function playBookAnim(className,durationMs,opts={}){
+  const reader=bookReaderEl();
+  if(!reader)return;
+  clearBookAnimClasses();
+  const stage=document.querySelector('.book-stage');
+  if(stage)stage.classList.add('book-animating');
+  // force reflow so animation restarts
+  void reader.offsetWidth;
+  reader.classList.add(className);
+  await waitMs(durationMs);
+  if(!opts.keepClass){
+    reader.classList.remove(className);
+    stage?.classList.remove('book-animating');
+  }
+}
+
+
+
 function escapeHtml(s=''){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function normalizeTag(s=''){return s.trim().replace(/\s+/g,' ');}
 function mangaIsColor(m){return !!m.es_color;}
@@ -77,12 +111,45 @@ function renderHome(list){
  ${filtered.length?'<div class="grid">'+filtered.map(m=>`<article class="card" onclick="openManga('${m.id}')"><img src="${escapeHtml(m.portada_url||'')}" alt=""><h3>${escapeHtml(m.nombre)}</h3>${renderTags(m)}</article>`).join('')+'</div>':'<div class="empty">No hay mangas en este modo todavía.</div>'}`;
 }
 function filterMangas(){const q=(document.getElementById('search')?.value||'').toLowerCase().trim();const list=mangas.filter(m=>m.nombre.toLowerCase().includes(q)||getMangaTags(m).some(t=>t.nombre.toLowerCase().includes(q)));renderHome(list);}
-function goHome(){history.pushState({},'',location.pathname);const s=document.getElementById('search');if(s)s.value='';document.body.classList.remove('reader-mode','reader-controls-hidden','book-mode');readerControlsHidden=false;bookState=null;renderHome(mangas);}
+async function goHome(){
+  history.pushState({},'',location.pathname);
+  const s=document.getElementById('search');
+  if(s)s.value='';
+  if(bookState&&document.body.classList.contains('book-mode')){
+    await closeBookAnimated();
+  }else{
+    document.body.classList.remove('reader-mode','reader-controls-hidden','book-mode');
+    readerControlsHidden=false;
+    bookState=null;
+  }
+  renderHome(mangas);
+}
+
+async function closeBookAnimated(){
+  if(!bookState){
+    document.body.classList.remove('reader-mode','reader-controls-hidden','book-mode');
+    readerControlsHidden=false;
+    return;
+  }
+  // Ir a portada y animar cierre
+  if(bookState.index!==0){
+    bookState.index=0;
+    bookState.animDirection='';
+    renderBook();
+    await waitMs(80);
+  }
+  await playBookAnim('book-anim-close',450);
+  clearBookAnimClasses();
+  document.body.classList.remove('reader-mode','reader-controls-hidden','book-mode');
+  readerControlsHidden=false;
+  bookState=null;
+}
 
 async function getTomoCover(t){return t?.portada_url||'';}
 
 async function openManga(id){
- document.body.classList.remove('reader-mode','reader-controls-hidden','book-mode');readerControlsHidden=false;
+ if(bookState&&document.body.classList.contains('book-mode')) await closeBookAnimated();
+ else { document.body.classList.remove('reader-mode','reader-controls-hidden','book-mode');readerControlsHidden=false; bookState=null; }
  const {data:m,error:mangaError}=await supabaseClient.from('mangas').select('*').eq('id',id).single();
  if(mangaError||!m){app.innerHTML='<div class="empty">No se pudo cargar el manga.<br><small>'+escapeHtml(mangaError?.message||'Error desconocido')+'</small><br><button onclick="openManga(\''+id+'\')">↻ Reintentar</button></div>';return}
  m.tags=getMangaTags(m);
@@ -97,7 +164,8 @@ async function openManga(id){
 }
 
 async function openTomo(mid,tid,num){
- document.body.classList.remove('reader-mode','reader-controls-hidden','book-mode');readerControlsHidden=false;
+ if(bookState&&document.body.classList.contains('book-mode')) await closeBookAnimated();
+ else { document.body.classList.remove('reader-mode','reader-controls-hidden','book-mode');readerControlsHidden=false; bookState=null; }
  const {data:cs}=await supabaseClient.from('capitulos').select('*').eq('tomo_id',tid).order('numero');
  const {data:t}=await supabaseClient.from('tomos').select('*').eq('id',tid).single();
  const bookButton=readerMode==='libro'?`<button class="book-open-btn" onclick="openBookTomo('${mid}','${tid}')">📕 Abrir tomo como libro</button>`:'';
@@ -233,16 +301,97 @@ function bookProgressPosition(book,mid,tid){
   return 0;
 }
 
-async function openBookTomo(mid,tid){
+async function openBookTomo(mid,tid,options={}){
   try{
+    const direction=options.direction||null; // 'next' | 'prev' | null
+    const animateOpen=options.animateOpen!==false;
+    const isSwitch=!!(bookState&&bookState.mid===mid&&bookState.tid!==tid&&direction);
+
+    if(isSwitch){
+      await switchTomoAnimated(mid,tid,direction);
+      return;
+    }
+
     const book=await fetchTomoBook(mid,tid);
     const saved=getProgress(mid);
-    const start=saved&&saved.tomoId===tid ? bookProgressPosition(book,mid,tid) : 0;
-    await openBookUI(mid,tid,book,start,true);
+    // En apertura fresca desde el menú de tomo, empezar en portada (índice 0)
+    // salvo que se pida restaurar progreso explícitamente.
+    const start=options.restoreProgress && saved && saved.tomoId===tid
+      ? bookProgressPosition(book,mid,tid)
+      : (saved&&saved.tomoId===tid&&!animateOpen ? bookProgressPosition(book,mid,tid) : 0);
+    await openBookUI(mid,tid,book,start,{fromTomo:true,animateOpen,direction:null});
   }catch(e){
     console.error(e);
     app.innerHTML='<div class="empty">No se pudo cargar el libro.</div>';
   }
+}
+
+async function switchTomoAnimated(mid,tid,direction){
+  const s=bookState;
+  if(!s)return;
+
+  // 1) Cerrar hacia la portada si no estamos en ella
+  if(s.index!==0){
+    s.index=0;
+    s.animDirection='';
+    renderBook();
+    await playBookAnim('book-anim-close',420);
+  }
+
+  // 2) Portada actual sale de la pantalla (mantener estado final hasta montar el nuevo)
+  const exitClass=direction==='prev'?'book-anim-tomo-exit-prev':'book-anim-tomo-exit-next';
+  await playBookAnim(exitClass,480,{keepClass:true});
+
+  // 3) Cargar tomo nuevo
+  let book;
+  try{
+    book=await fetchTomoBook(mid,tid);
+  }catch(e){
+    console.error(e);
+    app.innerHTML='<div class="empty">No se pudo cargar el libro.</div>';
+    return;
+  }
+
+  // 4) Montar estado en portada del tomo nuevo
+  const {data:m}=await supabaseClient.from('mangas').select('id,nombre').eq('id',mid).single();
+  const {data:tomos}=await supabaseClient.from('tomos').select('id,numero,portada_url').eq('manga_id',mid).order('numero');
+  const items=flattenBook(book);
+  const oldHidden=s.controlsHidden||false;
+
+  bookState={
+    mid,tid,book,items,
+    index:0,
+    controlsHidden:oldHidden,
+    mangaName:m?.nombre||'Manga',
+    navTomos:tomos||[],
+    chapterFlash:false,
+    animDirection:'',
+    touchX:null,
+    imageCache:new Map()
+  };
+
+  document.body.classList.add('reader-mode','book-mode');
+  document.body.classList.toggle('book-controls-hidden',oldHidden);
+
+  let page=document.querySelector('.book-reader-page');
+  if(!page){
+    app.innerHTML='<div class="chapter-reader-page book-reader-page"><div id="book-reader"></div></div>';
+    page=document.querySelector('.book-reader-page');
+  }else if(!document.getElementById('book-reader')){
+    page.innerHTML='<div id="book-reader"></div>';
+  }
+
+  // 5) Nueva portada entra
+  clearBookAnimClasses();
+  renderBook();
+  const enterClass=direction==='prev'?'book-anim-tomo-enter-prev':'book-anim-tomo-enter-next';
+  await playBookAnim(enterClass,480);
+
+  // 6) Se abre solo (animación de apertura sobre la portada)
+  await playBookAnim('book-anim-tomo-open',420);
+
+  preloadBookNeighbors();
+  window.setTimeout(()=>{ if(bookState) preloadBookNeighbors(); }, 120);
 }
 
 async function openBookChapter(mid,tid,cid,tomo,cap){
@@ -250,7 +399,7 @@ async function openBookChapter(mid,tid,cid,tomo,cap){
     const book=await fetchTomoBook(mid,tid);
     const items=flattenBook(book);
     const start=chapterFirstIndex(items,cid);
-    await openBookUI(mid,tid,book,start>0?start:0,false);
+    await openBookUI(mid,tid,book,start>0?start:0,{fromTomo:false,animateOpen:true});
   }catch(e){
     console.error(e);
     app.innerHTML='<div class="empty">No se pudo cargar el libro.</div>';
@@ -259,7 +408,9 @@ async function openBookChapter(mid,tid,cid,tomo,cap){
 
 function bookIndexToChapter(book,index){
   if(index<=0) return null;
-  const item=book?flattenBook(book)[index]:null;
+  // Preferir items ya aplanados en bookState para no recalcular flattenBook
+  const item=(bookState&&bookState.book===book?bookState.items:null)?.[index]
+    || (book?flattenBook(book)[index]:null);
   if(!item||item.type!=='page') return null;
   return {
     chapter:{id:item.chapterId,numero:item.chapter},
@@ -278,9 +429,9 @@ function renderBookPage(item,state,side){
   }
   if(item.type==='cover'){
     if(!item.src) return '<div class="book-sheet book-cover-sheet" aria-label="Portada sin imagen"></div>';
-    return `<div class="book-sheet book-cover-sheet"><img decoding="async" loading="eager" src="${escapeHtml(item.src)}" alt="Portada del tomo"></div>`;
+    return `<div class="book-sheet book-cover-sheet"><img decoding="async" loading="eager" fetchpriority="high" src="${escapeHtml(item.src)}" alt="Portada del tomo"></div>`;
   }
-  return `<div class="book-sheet book-page-sheet"><img decoding="async" loading="eager" src="${escapeHtml(item.src)}" alt="Página ${escapeHtml(String(item.page))}" data-book-page-id="${escapeHtml(item.id)}"></div>`;
+  return `<div class="book-sheet book-page-sheet"><img decoding="async" loading="eager" fetchpriority="high" src="${escapeHtml(item.src)}" alt="Página ${escapeHtml(String(item.page))}" data-book-page-id="${escapeHtml(item.id||'')}"></div>`;
 }
 
 function bookSpreadForState(state){
@@ -345,10 +496,11 @@ function renderBook(){
 
   const direction=s.animDirection;
   s.animDirection='';
+  preloadBookNeighbors();
   if(direction){
     window.setTimeout(()=>{
       if(bookState===s) preloadBookNeighbors();
-    },40);
+    },50);
   }
 }
 
@@ -358,9 +510,13 @@ function setBookIndex(index,direction){
   if(next===s.index)return false;
   s.index=next;
   s.animDirection=direction;
-  s.chapterFlash=(bookIndexToChapter(s.book,s.index)?.chapterId||null)!==(bookIndexToChapter(s.book,s.index-(direction==='next'?2:1))?.chapterId||null);
+  const currCh=bookIndexToChapter(s.book,s.index)?.chapterId||null;
+  const prevCh=bookIndexToChapter(s.book,s.index-(direction==='next'?2:1))?.chapterId||null;
+  s.chapterFlash=currCh!==prevCh;
   saveBookProgress();
   renderBook();
+  // Precarga inmediata de las siguientes páginas al cambiar de página
+  preloadBookNeighbors();
   if(s.chapterFlash){
     window.setTimeout(()=>{if(bookState===s){s.chapterFlash=false;renderBook();}},700);
   }
@@ -374,7 +530,7 @@ async function bookNext(){
       setBookIndex(1,'next');
     }else{
       const i=s.navTomos.findIndex(t=>t.id===s.tid);
-      if(i>=0&&i<s.navTomos.length-1) await openBookTomo(s.mid,s.navTomos[i+1].id);
+      if(i>=0&&i<s.navTomos.length-1) await openBookTomo(s.mid,s.navTomos[i+1].id,{direction:'next',animateOpen:false});
     }
     return;
   }
@@ -408,14 +564,14 @@ async function bookNext(){
   }
 
   const i=s.navTomos.findIndex(t=>t.id===s.tid);
-  if(i>=0&&i<s.navTomos.length-1) await openBookTomo(s.mid,s.navTomos[i+1].id);
+  if(i>=0&&i<s.navTomos.length-1) await openBookTomo(s.mid,s.navTomos[i+1].id,{direction:'next',animateOpen:false});
 }
 
 async function bookPrev(){
   const s=bookState;if(!s)return;
   if(s.index===0){
     const i=s.navTomos.findIndex(t=>t.id===s.tid);
-    if(i>0) await openBookTomo(s.mid,s.navTomos[i-1].id);
+    if(i>0) await openBookTomo(s.mid,s.navTomos[i-1].id,{direction:'prev',animateOpen:false});
     return;
   }
 
@@ -454,24 +610,53 @@ function saveBookProgress(){
 
 function preloadBookNeighbors(){
   const s=bookState;if(!s)return;
-  const indices=new Set([s.index-2,s.index-1,s.index+1,s.index+2]);
-  for(const i of indices){
+  if(!s.imageCache)s.imageCache=new Map();
+
+  // Prioridad: las 4 siguientes, luego 2 anteriores, luego un poco más adelante.
+  // Así al avanzar siempre hay margen de páginas ya en caché del navegador.
+  const ordered=[];
+  for(let d=1;d<=4;d++) ordered.push(s.index+d);
+  for(let d=1;d<=2;d++) ordered.push(s.index-d);
+  for(let d=5;d<=8;d++) ordered.push(s.index+d);
+
+  const seen=new Set();
+  for(const i of ordered){
+    if(i<0||i>=s.items.length||seen.has(i))continue;
+    seen.add(i);
     const x=s.items[i];
-    if(x?.type==='page'&&x.src){
-      const im=new Image();
-      im.decoding='async';
-      im.src=x.src;
+    if(!x||x.type!=='page'||!x.src)continue;
+    if(s.imageCache.has(x.src))continue;
+    const im=new Image();
+    im.decoding='async';
+    // fetchpriority alto solo para las 2 primeras siguientes
+    if(i===s.index+1||i===s.index+2){
+      try{im.fetchPriority='high';}catch(_){}
     }
+    im.src=x.src;
+    s.imageCache.set(x.src,im);
+  }
+
+  // Limitar tamaño de caché en memoria (mantener ~30 URLs recientes)
+  if(s.imageCache.size>40){
+    const keys=[...s.imageCache.keys()];
+    for(let k=0;k<keys.length-30;k++) s.imageCache.delete(keys[k]);
   }
 }
 
-function openNextTomoFromBook(){const s=bookState;if(!s)return;const ti=s.navTomos.findIndex(t=>t.id===s.tid);if(ti>=0&&ti<s.navTomos.length-1)openBookTomo(s.mid,s.navTomos[ti+1].id);}
-function openPrevTomoFromBook(){const s=bookState;if(!s)return;const ti=s.navTomos.findIndex(t=>t.id===s.tid);if(ti>0)openBookTomo(s.mid,s.navTomos[ti-1].id);}
+function openNextTomoFromBook(){const s=bookState;if(!s)return;const ti=s.navTomos.findIndex(t=>t.id===s.tid);if(ti>=0&&ti<s.navTomos.length-1)openBookTomo(s.mid,s.navTomos[ti+1].id,{direction:'next',animateOpen:false});}
+function openPrevTomoFromBook(){const s=bookState;if(!s)return;const ti=s.navTomos.findIndex(t=>t.id===s.tid);if(ti>0)openBookTomo(s.mid,s.navTomos[ti-1].id,{direction:'prev',animateOpen:false});}
 
-async function openBookUI(mid,tid,book,start,fromTomo){
+async function openBookUI(mid,tid,book,start,opts={}){
+  // Compat: openBookUI(..., true) o openBookUI(..., {fromTomo,animateOpen})
+  if(typeof opts==='boolean') opts={fromTomo:opts};
+  const fromTomo=!!opts.fromTomo;
+  const animateOpen=opts.animateOpen!==false;
+
   const oldPage=document.querySelector('.book-reader-page');
   const wasFullscreen=!!(oldPage&&(document.fullscreenElement===oldPage||document.webkitFullscreenElement===oldPage));
   const oldHidden=bookState?.controlsHidden||false;
+  const wasAlreadyBook=!!bookState && document.body.classList.contains('book-mode');
+
   const {data:m}=await supabaseClient.from('mangas').select('id,nombre').eq('id',mid).single();
   const {data:tomos}=await supabaseClient.from('tomos').select('id,numero,portada_url').eq('manga_id',mid).order('numero');
   const items=flattenBook(book);
@@ -483,7 +668,8 @@ async function openBookUI(mid,tid,book,start,fromTomo){
     navTomos:tomos||[],
     chapterFlash:false,
     animDirection:'',
-    touchX:null
+    touchX:null,
+    imageCache:bookState?.imageCache instanceof Map ? bookState.imageCache : new Map()
   };
 
   // En escritorio, nunca arrancamos en una página par como derecha.
@@ -496,13 +682,19 @@ async function openBookUI(mid,tid,book,start,fromTomo){
   document.body.classList.add('reader-mode','book-mode');
   document.body.classList.toggle('book-controls-hidden',oldHidden);
   if(oldPage){
-    oldPage.innerHTML='<div id="book-reader"></div>';
+    if(!document.getElementById('book-reader')) oldPage.innerHTML='<div id="book-reader"></div>';
   }else{
     app.innerHTML='<div class="chapter-reader-page book-reader-page"><div id="book-reader"></div></div>';
   }
 
   renderBook();
   preloadBookNeighbors();
+  window.setTimeout(()=>{ if(bookState) preloadBookNeighbors(); }, 120);
+
+  // Animación de apertura del libro (solo si no venimos de un cambio de tomo animado)
+  if(animateOpen && !wasAlreadyBook){
+    await playBookAnim('book-anim-open',560);
+  }
 
   const page=document.querySelector('.book-reader-page');
   if(wasFullscreen&&page&&!document.fullscreenElement){
