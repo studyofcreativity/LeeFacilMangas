@@ -83,9 +83,9 @@ async function getTomoCover(t){return t?.portada_url||'';}
 
 async function openManga(id){
  document.body.classList.remove('reader-mode','reader-controls-hidden','book-mode');readerControlsHidden=false;
- const {data:m,error:mangaError}=await supabaseClient.from('mangas').select('*,manga_etiquetas(etiqueta_id,etiquetas(id,nombre))').eq('id',id).single();
- if(mangaError||!m){app.innerHTML='<div class="empty">No se pudo cargar el manga.</div>';return}
- m.tags=(m.manga_etiquetas||[]).map(x=>x.etiquetas).filter(Boolean).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+ const {data:m,error:mangaError}=await supabaseClient.from('mangas').select('*').eq('id',id).single();
+ if(mangaError||!m){app.innerHTML='<div class="empty">No se pudo cargar el manga.<br><small>'+escapeHtml(mangaError?.message||'Error desconocido')+'</small><br><button onclick="openManga(\''+id+'\')">↻ Reintentar</button></div>';return}
+ m.tags=getMangaTags(m);
  const {data:ts}=await supabaseClient.from('tomos').select('*').eq('manga_id',id).order('numero');
  const tagHtml=renderTags(m);
  if(chapterViewMode==='capitulos'){
@@ -537,5 +537,12 @@ document.addEventListener('touchend',e=>{if(!bookState||bookState.touchX==null)r
 
 function restoreNormalProgress(mid,tid,cid,pagesLength,target){const p=getProgress(mid);if(!p||p.tomoId!==tid||p.chapterId!==cid)return;const page=Math.max(1,Math.min(p.page||1,pagesLength||1));setTimeout(()=>{const img=target.querySelector(`img[data-page-number="${page}"]`);if(img)img.scrollIntoView({block:'start'});},80);}
 
+
+window.addEventListener('error', e => {
+  console.error('LeeMangasCross:', e.error || e.message);
+});
+window.addEventListener('unhandledrejection', e => {
+  console.error('LeeMangasCross:', e.reason);
+});
 
 loadMangas();
