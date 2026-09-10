@@ -9,7 +9,7 @@ let bookState=null;
 const app=document.getElementById('app');
 
 function escapeHtml(s=''){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
-function normalizeTag(s=''){return s.trim().replace(/\\s+/g,' ');}
+function normalizeTag(s=''){return s.trim().replace(/\s+/g,' ');}
 function mangaIsColor(m){return !!m.es_color;}
 function getMangaTags(m){return Array.isArray(m.tags)?m.tags:[];}
 
@@ -432,15 +432,10 @@ async function bookPrev(){
       return;
     }
     // Página 1 de un capítulo: vuelve a la portada si es el primer capítulo,
-    // o a la última pareja del capítulo anterior.
+    // o a la última página (pareja) del capítulo anterior.
+    // renderBook corrige automáticamente si caemos en una página par.
     const prevItem=getBookItem(s,s.index-1);
     if(prevItem?.type==='page'&&prevItem.chapterId!==item.chapterId){
-      let i=s.index-1;
-      while(i>1){
-        const x=getBookItem(s,i),before=getBookItem(s,i-1);
-        if(x?.type==='page'&&before?.type==='page'&&x.chapterId!==item.chapterId) break;
-        i--;
-      }
       setBookIndex(Math.max(1,s.index-1),'prev');
       return;
     }
@@ -534,6 +529,55 @@ document.addEventListener('keydown',e=>{
 
 document.addEventListener('touchstart',e=>{if(!bookState||e.touches.length!==1)return;bookState.touchX=e.touches[0].clientX;},{passive:true});
 document.addEventListener('touchend',e=>{if(!bookState||bookState.touchX==null)return;const dx=e.changedTouches[0].clientX-bookState.touchX;bookState.touchX=null;if(Math.abs(dx)>55){if(dx<0)bookNext();else bookPrev();}},{passive:true});
+
+
+function setupNormalProgress(target,mid,tid,cid){
+  if(!target)return;
+  if(target._progressCleanup)target._progressCleanup();
+  let lastSaved=0;
+  const isFs=()=>document.fullscreenElement===target||document.webkitFullscreenElement===target;
+  const saveCurrent=()=>{
+    const imgs=[...target.querySelectorAll('#reader img[data-page-number]')];
+    if(!imgs.length)return;
+    const viewH=isFs()?target.clientHeight:window.innerHeight;
+    let best=null,bestScore=-Infinity;
+    for(const img of imgs){
+      const r=img.getBoundingClientRect();
+      // Prefer the page whose top is near the upper third of the viewport
+      if(r.bottom<=40||r.top>=viewH-20)continue;
+      const score=-(Math.abs(r.top-viewH*0.12))+Math.min(r.height,viewH)*0.001;
+      if(score>bestScore){bestScore=score;best=img;}
+    }
+    if(!best){
+      for(const img of imgs){
+        const r=img.getBoundingClientRect();
+        if(r.bottom>60&&r.top<viewH-60){best=img;break;}
+      }
+    }
+    if(best){
+      const page=Number(best.getAttribute('data-page-number'))||1;
+      if(page!==lastSaved){
+        lastSaved=page;
+        saveProgress(mid,tid,cid,page);
+      }
+    }
+  };
+  let ticking=false;
+  const onScroll=()=>{
+    if(ticking)return;
+    ticking=true;
+    requestAnimationFrame(()=>{saveCurrent();ticking=false;});
+  };
+  const onWindowScroll=()=>{if(!isFs())onScroll();};
+  const onTargetScroll=()=>{if(isFs())onScroll();};
+  window.addEventListener('scroll',onWindowScroll,{passive:true});
+  target.addEventListener('scroll',onTargetScroll,{passive:true});
+  target._progressCleanup=()=>{
+    window.removeEventListener('scroll',onWindowScroll);
+    target.removeEventListener('scroll',onTargetScroll);
+  };
+  setTimeout(saveCurrent,120);
+}
 
 function restoreNormalProgress(mid,tid,cid,pagesLength,target){const p=getProgress(mid);if(!p||p.tomoId!==tid||p.chapterId!==cid)return;const page=Math.max(1,Math.min(p.page||1,pagesLength||1));setTimeout(()=>{const img=target.querySelector(`img[data-page-number="${page}"]`);if(img)img.scrollIntoView({block:'start'});},80);}
 
