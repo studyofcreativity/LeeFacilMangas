@@ -323,3 +323,17 @@ body.reader-mode header input{
     width:calc(100% - 110px);
   }
 }
+
+/* LFM DOUBLE CLICK READER CONTROLS */
+body.reader-mode.reader-controls-hidden .reader-toolbar,
+body.reader-mode.reader-controls-hidden .reader-top-meta,
+body.reader-mode.reader-controls-hidden .chapter-nav-side,
+body.reader-mode.reader-controls-hidden .reader-bottom-nav,
+body.reader-mode.reader-controls-hidden .reader-back,
+body.reader-mode.reader-controls-hidden .reader-settings,
+body.reader-mode.reader-controls-hidden .reader-controls,
+body.reader-mode.reader-controls-hidden .reader-options,
+body.reader-mode.reader-controls-hidden .reader-size,
+body.reader-mode.reader-controls-hidden .reader-width,
+body.reader-mode.reader-controls-hidden .reader-fullscreen,
+body.reader-mode.reader-controls-hidden .reader-nav { display:none !important; }

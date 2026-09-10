@@ -269,3 +269,18 @@ function setReaderWidth(width){
 }
 
 loadMangas();
+/* LFM DOUBLE CLICK READER CONTROLS */
+(function(){
+  let hidden=false;
+  document.addEventListener('dblclick',function(e){
+    if(!document.body.classList.contains('reader-mode')) return;
+    const tag=(e.target&&e.target.tagName||'').toLowerCase();
+    if(['input','textarea','select','button','a'].includes(tag)) return;
+    hidden=!hidden;
+    document.body.classList.toggle('reader-controls-hidden',hidden);
+  });
+  const ob=new MutationObserver(function(){
+    if(!document.body.classList.contains('reader-mode')){ hidden=false; document.body.classList.remove('reader-controls-hidden'); }
+  });
+  ob.observe(document.body,{attributes:true,attributeFilter:['class']});
+})();
