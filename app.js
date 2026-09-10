@@ -332,6 +332,15 @@ function setupChapterEndPrompt(target){
    const nearBottom=(m.top+m.view)>=m.height-70;
    prompt.classList.toggle('show',nearBottom);
    target.classList.toggle('chapter-at-end',nearBottom);
+
+   // At the end of a chapter there must be ONLY the end-of-chapter navigation.
+   // Hide the normal side/bottom navigation explicitly as well as through CSS,
+   // so it cannot appear duplicated in browsers with different CSS support.
+   const sideNavs=target.querySelectorAll('.reader-side-nav');
+   const bottomNav=target.querySelector('.chapter-bottom-nav');
+   sideNavs.forEach(el=>{ el.style.display=nearBottom?'none':''; });
+   if(bottomNav) bottomNav.style.display=nearBottom?'none':'';
+   prompt.style.display=nearBottom?'flex':'';
  };
  const onWindowScroll=()=>{ if(!isFullscreen()) check(); };
  const onTargetScroll=()=>{ if(isFullscreen()) check(); };

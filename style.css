@@ -545,6 +545,15 @@ body.reader-mode.reader-controls-hidden .chapter-end-prompt{
 
 /* Al llegar al final, mostrar SOLO el aviso final de capítulo.
    Se ocultan las navegaciones normales para evitar botones duplicados. */
+.chapter-reader-page.chapter-at-end .reader-side-nav,
+.chapter-reader-page.chapter-at-end .chapter-bottom-nav{
+  display:none !important;
+}
+.chapter-reader-page.chapter-at-end .chapter-end-prompt.show{
+  display:flex !important;
+}
+
+
 .chapter-reader-page:has(.chapter-end-prompt.show) .reader-side-nav,
 .chapter-reader-page:has(.chapter-end-prompt.show) .chapter-bottom-nav{
   display:none !important;
