@@ -324,50 +324,136 @@ body.reader-mode header input{
   }
 }
 
-
-/* Selector de modo para visualizar los contenidos de un manga */
-.manga-view-switcher{
-  display:flex;
-  flex-wrap:wrap;
-  align-items:center;
-  gap:8px;
-  margin:22px 0 24px;
-  padding:12px;
+/* =========================================================
+   MODO DE VISUALIZACION EN EL INICIO
+   ========================================================= */
+.view-mode-panel{
+  width:min(100%, 720px);
+  margin:0 0 28px;
+  padding:16px;
+  box-sizing:border-box;
   background:#15151a;
   border:1px solid #303038;
-  border-radius:10px;
+  border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.22);
 }
-.manga-view-label{
-  width:100%;
-  font-size:13px;
-  color:#aaa;
+.view-mode-title{
+  font-size:16px;
   font-weight:700;
-  margin-bottom:2px;
+  color:#eee;
+  margin-bottom:11px;
 }
-.manga-view-btn{
-  background:#25252c;
-  color:#ddd;
+.view-mode-options{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.view-mode-btn{
+  flex:1 1 260px;
+  min-height:44px;
+  padding:10px 14px;
   border:1px solid #3a3a43;
   border-radius:8px;
-  padding:10px 14px;
+  background:#25252c;
+  color:#ddd;
+  font-weight:700;
+  font-size:14px;
   cursor:pointer;
-  font-weight:600;
   transition:.2s;
 }
-.manga-view-btn:hover{border-color:#e53945;background:#303038}
-.manga-view-btn.active{background:#e53945;color:#fff;border-color:#e53945;box-shadow:0 0 0 2px rgba(229,57,69,.18)}
-.chapter-flat{
+.view-mode-btn:hover{background:#303038;border-color:#e53945}
+.view-mode-btn.active{
+  background:#e53945;
+  border-color:#e53945;
+  color:#fff;
+  box-shadow:0 0 0 2px rgba(229,57,69,.18);
+}
+.view-mode-help{
+  margin-top:9px;
+  color:#92929b;
+  font-size:12px;
+}
+.chapter-view-heading{
+  font-size:20px;
+  font-weight:700;
+  margin:28px 0 12px;
+}
+.chapters-all{max-width:900px}
+.chapter-all-item{
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:15px;
 }
-.chapter-flat small{color:#999;font-size:12px}
-@media(max-width:600px){
-  .manga-view-switcher{display:block}
-  .manga-view-btn{width:100%;margin:4px 0}
-  .chapter-flat{padding:14px}
+.chapter-all-item small{
+  color:#999;
+  font-size:12px;
+  white-space:nowrap;
 }
 
+/* =========================================================
+   BOTON OJO DEL LECTOR
+   ========================================================= */
+.reader-meta-title-row{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  min-width:0;
+}
+.reader-meta-title-row .reader-meta-name{
+  max-width:calc(100% - 48px);
+}
+.reader-eye-toggle{
+  flex:0 0 34px;
+  width:34px;
+  height:30px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  border:1px solid #3a3a43;
+  border-radius:7px;
+  background:#25252c;
+  color:#fff;
+  cursor:pointer;
+  font-size:18px;
+  line-height:1;
+  transition:.2s;
+}
+.reader-eye-toggle:hover{
+  background:#303038;
+  border-color:#e53945;
+}
+.reader-eye-toggle.closed{
+  background:#202026;
+}
+.eye-svg{
+  width:19px;
+  height:19px;
+  display:block;
+}
 
-\n\n/* Menú de visualización en la página principal */\n.home-view-menu{\n  width:min(100%, 900px);\n  box-sizing:border-box;\n  margin:0 0 28px;\n  padding:14px 16px;\n  background:#15151a;\n  border:1px solid #303038;\n  border-radius:10px;\n}\n.home-view-menu-title{\n  font-size:14px;\n  font-weight:700;\n  color:#eee;\n  margin-bottom:10px;\n}\n.home-view-menu-buttons{\n  display:flex;\n  flex-wrap:wrap;\n  gap:8px;\n}\n.home-view-menu .manga-view-btn{\n  margin:0;\n}\n\n/* Cabecera del lector: nombre + ojo en la misma fila */\n.reader-meta-title-row{\n  display:flex;\n  align-items:center;\n  justify-content:center;\n  gap:8px;\n  min-width:0;\n}\n.reader-meta-title-row .reader-meta-name{\n  min-width:0;\n  flex:0 1 auto;\n}\n.reader-eye-toggle{\n  flex:0 0 34px;\n  width:34px;\n  height:30px;\n  display:inline-flex;\n  align-items:center;\n  justify-content:center;\n  padding:0;\n  border:1px solid #3a3a43;\n  border-radius:7px;\n  background:#25252c;\n  color:#fff;\n  font-size:17px;\n  line-height:1;\n  cursor:pointer;\n  transition:.2s;\n}\n.reader-eye-toggle:hover{\n  background:#303038;\n  border-color:#e53945;\n}\n\n/* Al ocultar el menú, el ojo y la cabecera siguen visibles. */\nbody.reader-mode.reader-controls-hidden .reader-toolbar,\nbody.reader-mode.reader-controls-hidden .chapter-reader-content > .back,\nbody.reader-mode.reader-controls-hidden .reader-side-nav,\nbody.reader-mode.reader-controls-hidden .chapter-bottom-nav{\n  display:none !important;\n}\nbody.reader-mode.reader-controls-hidden .reader-meta-top{\n  display:block !important;\n}\nbody.reader-mode.reader-controls-hidden .reader-eye-toggle{\n  display:inline-flex !important;\n}\n\n@media(max-width:600px){\n  .home-view-menu{padding:12px;margin-bottom:20px}\n  .home-view-menu-buttons{display:block}\n  .home-view-menu .manga-view-btn{width:100%;margin:4px 0}\n  .reader-meta-title-row{gap:5px}\n  .reader-eye-toggle{flex-basis:32px;width:32px;height:28px;font-size:16px}\n}\n
+/* Al ocultar el menú, solo queda el nombre + botón de ojo. */
+body.reader-mode.reader-controls-hidden .reader-toolbar,
+body.reader-mode.reader-controls-hidden .chapter-reader-content > .back,
+body.reader-mode.reader-controls-hidden .reader-side-nav,
+body.reader-mode.reader-controls-hidden .chapter-bottom-nav{
+  display:none !important;
+}
+body.reader-mode.reader-controls-hidden .reader-meta-top{
+  display:block !important;
+}
+body.reader-mode.reader-controls-hidden .reader-meta-title-row{
+  display:flex !important;
+}
+body.reader-mode.reader-controls-hidden .reader-eye-toggle{
+  display:inline-flex !important;
+}
+
+@media(max-width:600px){
+  .view-mode-panel{margin-bottom:20px;padding:13px}
+  .view-mode-btn{flex-basis:100%;font-size:13px}
+  .chapter-all-item{align-items:flex-start}
+  .reader-eye-toggle{width:32px;height:28px;flex-basis:32px}
+}
