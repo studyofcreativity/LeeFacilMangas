@@ -1302,7 +1302,7 @@ body.reader-mode.reader-controls-hidden .social-bar-inline{
 }
 
 
-/* Zoom automático a la página que se está leyendo (modo libro) */
+ (modo libro) */
 .book-stage.book-two-pages{
   overflow:hidden;
 }
@@ -1350,6 +1350,97 @@ body.reader-mode.reader-controls-hidden .social-bar-inline{
   .book-spread.book-zoom-right,
   .book-spread.book-zoom-left,
   .book-sheet[data-side]{
+    transition:none;
+  }
+}
+
+
+/* === Enfoque de página en modo libro (sin recortes raros) === */
+.book-stage.book-two-pages{
+  overflow:hidden;
+}
+.book-stage.book-two-pages .book-spread.book-spread-pair{
+  display:flex !important;
+  flex-direction:row !important;
+  align-items:stretch !important;
+  justify-content:center !important;
+  width:100% !important;
+  max-width:100% !important;
+  height:calc(100vh - 142px);
+  gap:0;
+  transform:none !important; /* no scale global que recorta */
+  transition:none;
+}
+.book-stage.book-two-pages .book-spread.book-spread-pair .book-sheet{
+  display:flex !important;
+  align-items:center;
+  justify-content:center;
+  min-width:0;
+  height:100%;
+  overflow:hidden;
+  transition: flex-basis .35s cubic-bezier(.22,.72,.26,1),
+              max-width .35s cubic-bezier(.22,.72,.26,1),
+              opacity .3s ease,
+              filter .3s ease;
+}
+.book-stage.book-two-pages .book-spread.book-spread-pair .book-sheet img{
+  max-width:100%;
+  max-height:100%;
+  width:auto;
+  height:auto;
+  object-fit:contain;
+}
+
+/* Por defecto 50/50 */
+.book-stage.book-two-pages:not(.book-focus-left):not(.book-focus-right) .book-sheet{
+  flex:1 1 50%;
+  max-width:50%;
+  opacity:1;
+}
+
+/* Enfocando página DERECHA (lectura actual = der) */
+.book-stage.book-focus-right .book-sheet[data-side="right"]{
+  flex:1 1 78% !important;
+  max-width:78% !important;
+  opacity:1 !important;
+  filter:none !important;
+  z-index:2;
+}
+.book-stage.book-focus-right .book-sheet[data-side="left"]{
+  flex:0 0 22% !important;
+  max-width:22% !important;
+  opacity:.4 !important;
+  filter:brightness(.65);
+  z-index:1;
+}
+
+/* Enfocando página IZQUIERDA */
+.book-stage.book-focus-left .book-sheet[data-side="left"]{
+  flex:1 1 78% !important;
+  max-width:78% !important;
+  opacity:1 !important;
+  filter:none !important;
+  z-index:2;
+}
+.book-stage.book-focus-left .book-sheet[data-side="right"]{
+  flex:0 0 22% !important;
+  max-width:22% !important;
+  opacity:.4 !important;
+  filter:brightness(.65);
+  z-index:1;
+}
+
+@media (max-width:699px){
+  .book-stage.book-focus-right .book-sheet,
+  .book-stage.book-focus-left .book-sheet{
+    flex:1 1 100% !important;
+    max-width:100% !important;
+    opacity:1 !important;
+    filter:none !important;
+  }
+}
+@media (prefers-reduced-motion:reduce){
+  .book-stage.book-two-pages .book-spread.book-spread-pair .book-sheet{
     transition:none;
   }
 }
