@@ -713,7 +713,7 @@ body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .cha
   max-width:100%;
 }
 
-/* Doble página: las dos hojas siempre visibles e iguales */
+/* Doble página base (el foco puede cambiar anchos) */
 .book-stage.book-two-pages .book-spread.book-spread-pair{
   width:min(100%,1280px);
   display:flex;
@@ -723,11 +723,11 @@ body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .cha
   gap:0;
 }
 .book-stage.book-two-pages .book-spread.book-spread-pair .book-sheet{
-  display:flex !important;
-  width:50% !important;
-  max-width:50% !important;
+  display:flex;
   min-width:0;
   flex:1 1 50%;
+  width:auto;
+  max-width:50%;
   height:100%;
 }
 .book-stage.book-two-pages .book-spread.book-spread-pair .book-sheet img{
@@ -760,10 +760,6 @@ body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .cha
 .book-stage.book-two-pages .book-spread.book-spread-pair .book-sheet{
   display:flex !important;
   visibility:visible !important;
-  opacity:1 !important;
-  flex:1 1 50% !important;
-  width:50% !important;
-  max-width:50% !important;
   min-width:0 !important;
   height:100% !important;
   margin:0 !important;
@@ -772,7 +768,6 @@ body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .cha
 .book-stage.book-two-pages .book-spread.book-spread-pair .book-sheet img{
   display:block !important;
   visibility:visible !important;
-  opacity:1 !important;
   max-width:100% !important;
   max-height:100% !important;
   width:auto !important;
@@ -1314,9 +1309,7 @@ body.reader-mode.reader-controls-hidden .social-bar-inline{
 
 
 /* === Cámara + brillo alineados a la página activa === */
-.book-stage.book-two-pages{
-  overflow:hidden;
-}
+.book-stage.book-two-pages{overflow:hidden}
 .book-stage.book-two-pages .book-spread.book-spread-pair{
   display:flex !important;
   flex-direction:row !important;
@@ -1337,7 +1330,7 @@ body.reader-mode.reader-controls-hidden .social-bar-inline{
   height:100% !important;
   overflow:hidden !important;
   margin:0 !important;
-  transition: flex-grow .32s ease, flex-basis .32s ease, max-width .32s ease, opacity .28s ease, filter .28s ease;
+  transition: flex .32s ease, width .32s ease, max-width .32s ease, opacity .28s ease, filter .28s ease;
 }
 .book-stage.book-two-pages .book-spread.book-spread-pair .book-sheet img{
   max-width:100% !important;
@@ -1346,50 +1339,54 @@ body.reader-mode.reader-controls-hidden .social-bar-inline{
   height:auto !important;
   object-fit:contain !important;
 }
-
-/* Sin foco especial: 50/50 */
-.book-stage.book-two-pages .book-sheet[data-side="left"],
-.book-stage.book-two-pages .book-sheet[data-side="right"]{
+.book-stage.book-two-pages:not(.book-focus-left):not(.book-focus-right) .book-sheet[data-side="left"],
+.book-stage.book-two-pages:not(.book-focus-left):not(.book-focus-right) .book-sheet[data-side="right"]{
   flex:1 1 50%;
+  width:50%;
   max-width:50%;
   opacity:1;
   filter:none;
 }
 
-/*
-  pageFocus=right → cámara y brillo en la DERECHA
-  pageFocus=left  → cámara y brillo en la IZQUIERDA
-*/
-.book-stage.book-focus-right .book-sheet[data-side="right"]{
-  flex:3 1 0 !important;
-  max-width:75% !important;
-  opacity:1 !important;
-  filter:none !important;
+/* Cámara: página activa grande, la otra pequeña (gana a cualquier 50%) */
+.book-stage.book-two-pages.book-focus-right .book-spread.book-spread-pair .book-sheet[data-side="right"]{
+  flex: 3 1 0% !important;
+  width: 75% !important;
+  max-width: 75% !important;
+  opacity: 1 !important;
+  filter: none !important;
+  z-index: 2;
 }
-.book-stage.book-focus-right .book-sheet[data-side="left"]{
-  flex:1 1 0 !important;
-  max-width:25% !important;
-  opacity:.38 !important;
-  filter:brightness(.55) !important;
+.book-stage.book-two-pages.book-focus-right .book-spread.book-spread-pair .book-sheet[data-side="left"]{
+  flex: 1 1 0% !important;
+  width: 25% !important;
+  max-width: 25% !important;
+  opacity: 0.35 !important;
+  filter: brightness(0.5) !important;
+  z-index: 1;
 }
-
-.book-stage.book-focus-left .book-sheet[data-side="left"]{
-  flex:3 1 0 !important;
-  max-width:75% !important;
-  opacity:1 !important;
-  filter:none !important;
+.book-stage.book-two-pages.book-focus-left .book-spread.book-spread-pair .book-sheet[data-side="left"]{
+  flex: 3 1 0% !important;
+  width: 75% !important;
+  max-width: 75% !important;
+  opacity: 1 !important;
+  filter: none !important;
+  z-index: 2;
 }
-.book-stage.book-focus-left .book-sheet[data-side="right"]{
-  flex:1 1 0 !important;
-  max-width:25% !important;
-  opacity:.38 !important;
-  filter:brightness(.55) !important;
+.book-stage.book-two-pages.book-focus-left .book-spread.book-spread-pair .book-sheet[data-side="right"]{
+  flex: 1 1 0% !important;
+  width: 25% !important;
+  max-width: 25% !important;
+  opacity: 0.35 !important;
+  filter: brightness(0.5) !important;
+  z-index: 1;
 }
 
 @media (max-width:699px){
-  .book-stage.book-focus-right .book-sheet[data-side],
-  .book-stage.book-focus-left .book-sheet[data-side]{
+  .book-stage.book-two-pages.book-focus-right .book-spread.book-spread-pair .book-sheet[data-side],
+  .book-stage.book-two-pages.book-focus-left .book-spread.book-spread-pair .book-sheet[data-side]{
     flex:1 1 100% !important;
+    width:100% !important;
     max-width:100% !important;
     opacity:1 !important;
     filter:none !important;
