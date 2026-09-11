@@ -609,8 +609,35 @@ body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .cha
 .book-reader-page:fullscreen .book-stage,.book-reader-page:-webkit-full-screen .book-stage{min-height:calc(100vh - 96px);padding-top:12px;padding-bottom:12px}
 .book-reader-page:fullscreen .book-spread,.book-reader-page:-webkit-full-screen .book-spread{height:calc(100vh - 120px);max-width:1400px}
 
-.book-flip-next{animation:lmcBookFlipNext .38s cubic-bezier(.22,.72,.26,1) both;transform-origin:right center}
-.book-flip-prev{animation:lmcBookFlipPrev .38s cubic-bezier(.22,.72,.26,1) both;transform-origin:left center}
+
+/* Paso de página tipo libro real: la hoja se curva y gira */
+@keyframes lmcBookFlipNext{
+  0%{transform:perspective(1400px) rotateY(0deg);opacity:1}
+  35%{transform:perspective(1400px) rotateY(-28deg) scaleX(.96);opacity:.95;filter:brightness(.9)}
+  70%{transform:perspective(1400px) rotateY(8deg) scale(1.01);opacity:1;filter:brightness(1.02)}
+  100%{transform:perspective(1400px) rotateY(0) scale(1);opacity:1;filter:none}
+}
+@keyframes lmcBookFlipPrev{
+  0%{transform:perspective(1400px) rotateY(0deg);opacity:1}
+  35%{transform:perspective(1400px) rotateY(28deg) scaleX(.96);opacity:.95;filter:brightness(.9)}
+  70%{transform:perspective(1400px) rotateY(-8deg) scale(1.01);opacity:1;filter:brightness(1.02)}
+  100%{transform:perspective(1400px) rotateY(0) scale(1);opacity:1;filter:none}
+}
+@keyframes lmcPageCurlNext{
+  0%{transform:perspective(1200px) rotateY(0deg);box-shadow:none;z-index:5}
+  40%{transform:perspective(1200px) rotateY(-95deg);box-shadow:-18px 0 30px rgba(0,0,0,.35);z-index:8}
+  100%{transform:perspective(1200px) rotateY(-180deg);box-shadow:none;opacity:0;z-index:1}
+}
+@keyframes lmcPageCurlPrev{
+  0%{transform:perspective(1200px) rotateY(0deg);box-shadow:none;z-index:5}
+  40%{transform:perspective(1200px) rotateY(95deg);box-shadow:18px 0 30px rgba(0,0,0,.35);z-index:8}
+  100%{transform:perspective(1200px) rotateY(180deg);box-shadow:none;opacity:0;z-index:1}
+}
+@keyframes lmcBookShadowNext{0%,100%{opacity:0}45%{opacity:.85}}
+@keyframes lmcBookShadowPrev{0%,100%{opacity:0}45%{opacity:.85}}
+
+.book-flip-next{animation:lmcBookFlipNext .52s cubic-bezier(.25,.8,.25,1) both;transform-origin:left center;transform-style:preserve-3d}
+.book-flip-prev{animation:lmcBookFlipPrev .52s cubic-bezier(.25,.8,.25,1) both;transform-origin:right center;transform-style:preserve-3d}
 .book-flip-next::after,.book-flip-prev::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent 58%,rgba(0,0,0,.18) 78%,rgba(255,255,255,.10));opacity:0}
 .book-flip-next::after{animation:lmcBookShadowNext .38s ease both}
 .book-flip-prev::after{animation:lmcBookShadowPrev .38s ease both;background:linear-gradient(90deg,rgba(0,0,0,.18),transparent 42%,rgba(255,255,255,.08))}
@@ -683,12 +710,32 @@ body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .cha
 }
 @media (prefers-reduced-motion:reduce){.book-flip-next,.book-flip-prev,.book-chapter-flash{animation:none}}
 
-.book-anim-open .book-spread{animation:lmcBookOpen .55s cubic-bezier(.22,.72,.26,1) both;transform-origin:center center}
-.book-anim-close .book-spread{animation:lmcBookClose .45s cubic-bezier(.4,.0,.2,1) both;transform-origin:center center}
-.book-anim-tomo-exit-next .book-spread{animation:lmcTomoExitNext .48s cubic-bezier(.4,0,.2,1) both}
-.book-anim-tomo-exit-prev .book-spread{animation:lmcTomoExitPrev .48s cubic-bezier(.4,0,.2,1) both}
-.book-anim-tomo-enter-next .book-spread{animation:lmcTomoEnterNext .48s cubic-bezier(.22,.72,.26,1) both}
-.book-anim-tomo-enter-prev .book-spread{animation:lmcTomoEnterPrev .48s cubic-bezier(.22,.72,.26,1) both}
-.book-anim-tomo-open .book-spread{animation:lmcTomoAutoOpen .42s cubic-bezier(.22,.72,.26,1) both}
+.book-anim-open .book-spread{animation:lmcBookOpen .48s cubic-bezier(.22,.72,.26,1) both;transform-origin:center center}
+.book-anim-close .book-spread{animation:lmcBookClose .38s cubic-bezier(.4,.0,.2,1) both;transform-origin:center center}
+.book-anim-tomo-exit-next .book-spread{animation:lmcTomoExitNext .40s cubic-bezier(.4,0,.2,1) both}
+.book-anim-tomo-exit-prev .book-spread{animation:lmcTomoExitPrev .40s cubic-bezier(.4,0,.2,1) both}
+.book-anim-tomo-enter-next .book-spread{animation:lmcTomoEnterNext .40s cubic-bezier(.22,.72,.26,1) both}
+.book-anim-tomo-enter-prev .book-spread{animation:lmcTomoEnterPrev .40s cubic-bezier(.22,.72,.26,1) both}
+.book-anim-tomo-open .book-spread{animation:lmcTomoAutoOpen .32s cubic-bezier(.22,.72,.26,1) both}
 .book-stage.book-animating{pointer-events:none}
 .book-spread{will-change:transform,opacity}
+
+.book-flip-next .book-page-sheet:last-child,
+.book-flip-next .book-cover-sheet{
+  animation:lmcPageCurlNext .52s cubic-bezier(.25,.8,.25,1) both;
+  transform-origin:left center;
+  transform-style:preserve-3d;
+  backface-visibility:hidden;
+}
+.book-flip-prev .book-page-sheet:first-child,
+.book-flip-prev .book-cover-sheet{
+  animation:lmcPageCurlPrev .52s cubic-bezier(.25,.8,.25,1) both;
+  transform-origin:right center;
+  transform-style:preserve-3d;
+  backface-visibility:hidden;
+}
+.book-two-pages.book-flip-next .book-page-sheet:first-child{
+  /* página izquierda estable */
+}
+.book-spread{transform-style:preserve-3d}
+.book-sheet{transform-style:preserve-3d}
