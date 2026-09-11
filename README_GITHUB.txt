@@ -20,3 +20,15 @@ ACTUALIZACIÓN DEL LECTOR
 - La navegación continúa entre tomos automáticamente.
 - La barra inferior muestra nombre del manga, tomo, capítulo y posición.
 - También hay flechas laterales para cambiar de capítulo.
+
+
+================================================
+LIKES / COMENTARIOS / CAPÍTULOS LEÍDOS
+================================================
+1) En Supabase → Authentication → Providers → habilita "Anonymous Sign-Ins".
+2) Ejecuta el archivo SUPABASE_SOCIAL.sql en el SQL Editor.
+3) Sube este público a GitHub Pages (o tu hosting) y fuerza Ctrl+F5.
+
+Al entrar, el lector crea (o reutiliza) una cuenta anónima en el navegador.
+Puedes dar me gusta, dislike y comentar capítulos.
+Al llegar al final de un capítulo se marca como leído (✓ al lado en la lista).

@@ -7,6 +7,176 @@ let readerControlsHidden=false;
 let bookState=null;
 const app=document.getElementById('app');
 
+/* ===== Cuenta anónima + likes / dislikes / comentarios / leídos ===== */
+let currentUserId=null;
+let readChapterIds=new Set();
+
+async function initReaderAuth(){
+  try{
+    const s=await ensureAnonSession();
+    currentUserId=s?.user?.id||getUserId();
+    if(currentUserId) await loadReadChapters();
+  }catch(e){
+    console.warn('LeeMangasCross auth:',e);
+  }
+}
+
+async function loadReadChapters(){
+  if(!currentUserId)return;
+  const {data,error}=await supabaseClient.from('chapter_reads').select('chapter_id').eq('user_id',currentUserId);
+  if(error){console.warn(error);return;}
+  readChapterIds=new Set((data||[]).map(r=>r.chapter_id));
+}
+
+async function markChapterRead(chapterId,mangaId){
+  if(!currentUserId||!chapterId)return;
+  if(readChapterIds.has(chapterId))return;
+  const {error}=await supabaseClient.from('chapter_reads').upsert(
+    {user_id:currentUserId,chapter_id:chapterId,manga_id:mangaId||null},
+    {onConflict:'user_id,chapter_id'}
+  );
+  if(error){console.warn('markChapterRead',error);return;}
+  readChapterIds.add(chapterId);
+  // actualizar checks visibles
+  document.querySelectorAll(`[data-chapter-id="${chapterId}"]`).forEach(el=>{
+    el.classList.add('chapter-read');
+    if(!el.querySelector('.chapter-check')){
+      const s=document.createElement('span');
+      s.className='chapter-check';
+      s.title='Leído';
+      s.textContent='✓';
+      el.appendChild(s);
+    }
+  });
+}
+
+function chapterReadBadge(chapterId){
+  if(!readChapterIds.has(chapterId)) return '';
+  return '<span class="chapter-check" title="Leído">✓</span>';
+}
+
+async function loadReactionState(chapterId){
+  const empty={likes:0,dislikes:0,mine:null};
+  if(!chapterId)return empty;
+  const {data,error}=await supabaseClient.from('chapter_reactions').select('user_id,reaction').eq('chapter_id',chapterId);
+  if(error){console.warn(error);return empty;}
+  let likes=0,dislikes=0,mine=null;
+  for(const r of (data||[])){
+    if(r.reaction==='like')likes++;
+    else if(r.reaction==='dislike')dislikes++;
+    if(currentUserId&&r.user_id===currentUserId)mine=r.reaction;
+  }
+  return {likes,dislikes,mine};
+}
+
+async function setReaction(chapterId,reaction){
+  if(!currentUserId){await initReaderAuth();}
+  if(!currentUserId){alert('No se pudo iniciar sesión anónima. Revisa Anonymous Sign-Ins en Supabase.');return;}
+  const state=await loadReactionState(chapterId);
+  if(state.mine===reaction){
+    // quitar reacción
+    await supabaseClient.from('chapter_reactions').delete().eq('chapter_id',chapterId).eq('user_id',currentUserId);
+  }else if(state.mine){
+    await supabaseClient.from('chapter_reactions').update({reaction}).eq('chapter_id',chapterId).eq('user_id',currentUserId);
+  }else{
+    await supabaseClient.from('chapter_reactions').insert({user_id:currentUserId,chapter_id:chapterId,reaction});
+  }
+  await refreshSocialBar(chapterId);
+}
+
+async function loadComments(chapterId){
+  const {data,error}=await supabaseClient.from('chapter_comments')
+    .select('id,user_id,body,created_at')
+    .eq('chapter_id',chapterId)
+    .order('created_at',{ascending:true});
+  if(error){console.warn(error);return[];}
+  return data||[];
+}
+
+async function postComment(chapterId){
+  const input=document.getElementById('comment-input');
+  const body=(input?.value||'').trim();
+  if(!body)return;
+  if(!currentUserId){await initReaderAuth();}
+  if(!currentUserId){alert('No se pudo iniciar sesión anónima.');return;}
+  if(body.length>2000){alert('Máximo 2000 caracteres.');return;}
+  const {error}=await supabaseClient.from('chapter_comments').insert({
+    user_id:currentUserId,chapter_id:chapterId,body
+  });
+  if(error){alert(error.message||'No se pudo publicar');return;}
+  if(input)input.value='';
+  await refreshComments(chapterId);
+}
+
+async function deleteComment(commentId,chapterId){
+  if(!currentUserId)return;
+  await supabaseClient.from('chapter_comments').delete().eq('id',commentId).eq('user_id',currentUserId);
+  await refreshComments(chapterId);
+}
+
+function formatCommentDate(iso){
+  try{
+    const d=new Date(iso);
+    return d.toLocaleString('es',{dateStyle:'short',timeStyle:'short'});
+  }catch(_){return '';}
+}
+
+async function refreshComments(chapterId){
+  const box=document.getElementById('comments-list');
+  if(!box)return;
+  box.innerHTML='<div class="comments-loading">Cargando comentarios...</div>';
+  const list=await loadComments(chapterId);
+  if(!list.length){
+    box.innerHTML='<div class="comments-empty">Sé el primero en comentar.</div>';
+    return;
+  }
+  box.innerHTML=list.map(c=>{
+    const mine=currentUserId&&c.user_id===currentUserId;
+    const anon='Lector '+(c.user_id||'').slice(0,6);
+    return `<div class="comment-item">
+      <div class="comment-meta"><span>${escapeHtml(anon)}</span><span>${escapeHtml(formatCommentDate(c.created_at))}</span>
+      ${mine?`<button type="button" class="comment-del" onclick="deleteComment('${c.id}','${chapterId}')">Eliminar</button>`:''}
+      </div>
+      <div class="comment-body">${escapeHtml(c.body)}</div>
+    </div>`;
+  }).join('');
+}
+
+async function refreshSocialBar(chapterId){
+  const bar=document.getElementById('social-bar');
+  if(!bar)return;
+  const st=await loadReactionState(chapterId);
+  bar.innerHTML=`
+    <button type="button" class="react-btn ${st.mine==='like'?'active like':''}" onclick="setReaction('${chapterId}','like')">👍 <span id="like-count">${st.likes}</span></button>
+    <button type="button" class="react-btn ${st.mine==='dislike'?'active dislike':''}" onclick="setReaction('${chapterId}','dislike')">👎 <span id="dislike-count">${st.dislikes}</span></button>
+  `;
+}
+
+function socialPanelHtml(chapterId){
+  return `
+<section class="social-panel" id="social-panel">
+  <div class="social-bar" id="social-bar">
+    <button type="button" class="react-btn" disabled>👍 …</button>
+    <button type="button" class="react-btn" disabled>👎 …</button>
+  </div>
+  <div class="comments-box">
+    <h3 class="comments-title">Comentarios</h3>
+    <div id="comments-list" class="comments-list"><div class="comments-loading">Cargando...</div></div>
+    <div class="comment-form">
+      <textarea id="comment-input" maxlength="2000" rows="2" placeholder="Escribe un comentario..."></textarea>
+      <button type="button" class="comment-send" onclick="postComment('${chapterId}')">Publicar</button>
+    </div>
+  </div>
+</section>`;
+}
+
+async function mountSocial(chapterId){
+  await refreshSocialBar(chapterId);
+  await refreshComments(chapterId);
+}
+
+
+
 function waitMs(ms){return new Promise(r=>setTimeout(r,ms));}
 
 function bookReaderEl(){return document.getElementById('book-reader');}
@@ -47,6 +217,7 @@ function mangaIsColor(m){return !!m.es_color;}
 function getMangaTags(m){return Array.isArray(m.tags)?m.tags:[];}
 
 async function loadMangas(){
+ await initReaderAuth();
  app.innerHTML='<div class="loading">Cargando mangas...</div>';
  try{
    const {data,error}=await supabaseClient.from('mangas').select('*').order('nombre');
@@ -151,7 +322,7 @@ async function openManga(id){
  if(chapterViewMode==='capitulos'){
   const allChapters=[];
   for(const t of (ts||[])){const {data:cs}=await supabaseClient.from('capitulos').select('*').eq('tomo_id',t.id).order('numero');(cs||[]).forEach(c=>allChapters.push({...c,tomoNumero:t.numero,tomoId:t.id,tomoCover:t.portada_url}));}
-  app.innerHTML=`<button class="back" onclick="goHome()">← Inicio</button><div class="manga-detail-head"><div><h1>${escapeHtml(m.nombre)}</h1>${m.descripcion?'<p>'+escapeHtml(m.descripcion)+'</p>':''}${tagHtml}</div></div><div class="chapter-view-heading">Todos los capítulos</div><div class="chapters chapters-all">${allChapters.map(c=>`<div class="chapter chapter-all-item" onclick="openChapter('${id}','${c.tomoId}','${c.id}',${c.tomoNumero},${c.numero})"><span>Capítulo ${escapeHtml(String(c.numero))}</span><small>Tomo ${escapeHtml(String(c.tomoNumero))}</small></div>`).join('')||'<div class="empty">Sin capítulos todavía.</div>'}</div>`;return;
+  app.innerHTML=`<button class="back" onclick="goHome()">← Inicio</button><div class="manga-detail-head"><div><h1>${escapeHtml(m.nombre)}</h1>${m.descripcion?'<p>'+escapeHtml(m.descripcion)+'</p>':''}${tagHtml}</div></div><div class="chapter-view-heading">Todos los capítulos</div><div class="chapters chapters-all">${allChapters.map(c=>`<div class="chapter chapter-all-item ${readChapterIds.has(c.id)?'chapter-read':''}" data-chapter-id="${c.id}" onclick="openChapter('${id}','${c.tomoId}','${c.id}',${c.tomoNumero},${c.numero})"><span class="chapter-label">Capítulo ${escapeHtml(String(c.numero))}</span><small>Tomo ${escapeHtml(String(c.tomoNumero))}</small>${chapterReadBadge(c.id)}</div>`).join('')||'<div class="empty">Sin capítulos todavía.</div>'}</div>`;return;
  }
  app.innerHTML=`<button class="back" onclick="goHome()">← Inicio</button><h1>${escapeHtml(m.nombre)}</h1>${m.descripcion?'<p>'+escapeHtml(m.descripcion)+'</p>':''}${tagHtml}<h2>Tomos</h2><div class="tomos">${(ts||[]).map(t=>`<div class="tomo" onclick="openTomo('${id}','${t.id}',${t.numero})">${t.portada_url?`<img class="tomo-cover" src="${escapeHtml(t.portada_url)}" alt="">`:''}<span>Tomo ${escapeHtml(String(t.numero))}</span></div>`).join('')||'<div class="empty">Sin tomos todavía.</div>'}</div>`;
 }
@@ -162,7 +333,7 @@ async function openTomo(mid,tid,num){
  const {data:cs}=await supabaseClient.from('capitulos').select('*').eq('tomo_id',tid).order('numero');
  const {data:t}=await supabaseClient.from('tomos').select('*').eq('id',tid).single();
  const bookButton=readerMode==='libro'?`<button class="book-open-btn" onclick="openBookTomo('${mid}','${tid}')">📕 Abrir tomo como libro</button>`:'';
- app.innerHTML=`<button class="back" onclick="openManga('${mid}')">← Volver al manga</button><div class="tomo-page-head">${t?.portada_url?`<img class="tomo-cover-large" src="${escapeHtml(t.portada_url)}" alt="Portada del Tomo ${escapeHtml(String(num))}">`:''}<div><h1>Tomo ${escapeHtml(String(num))}</h1>${bookButton}</div></div><div class="chapters">${(cs||[]).map(c=>`<div class="chapter" onclick="openChapter('${mid}','${tid}','${c.id}',${num},${c.numero})">Capítulo ${escapeHtml(String(c.numero))}</div>`).join('')||'<div class="empty">Sin capítulos todavía.</div>'}</div>`;
+ app.innerHTML=`<button class="back" onclick="openManga('${mid}')">← Volver al manga</button><div class="tomo-page-head">${t?.portada_url?`<img class="tomo-cover-large" src="${escapeHtml(t.portada_url)}" alt="Portada del Tomo ${escapeHtml(String(num))}">`:''}<div><h1>Tomo ${escapeHtml(String(num))}</h1>${bookButton}</div></div><div class="chapters">${(cs||[]).map(c=>`<div class="chapter ${readChapterIds.has(c.id)?'chapter-read':''}" data-chapter-id="${c.id}" onclick="openChapter('${mid}','${tid}','${c.id}',${num},${c.numero})"><span class="chapter-label">Capítulo ${escapeHtml(String(c.numero))}</span>${chapterReadBadge(c.id)}</div>`).join('')||'<div class="empty">Sin capítulos todavía.</div>'}</div>`;
 }
 
 async function getChapterNavigation(mid,tid,cid){
@@ -189,16 +360,19 @@ async function openChapter(mid,tid,cid,tomo,cap){
  if(!target)return;
  readerControlsHidden=wasReaderOpen?wasControlsHidden:false;document.body.classList.toggle('reader-controls-hidden',readerControlsHidden);
  target.innerHTML=normalReaderHtml(mid,tid,cid,tomo,cap,pages,nav,index,previous,next,totalChapters);
- updateEyeButton();updateFullscreenButton();setupChapterEndPrompt(target);
+ updateEyeButton();updateFullscreenButton();setupChapterEndPrompt(target,mid,cid);
  restoreNormalProgress(mid,tid,cid,pages.length,target);
  setupNormalProgress(target,mid,tid,cid);
+ mountSocial(cid);
  if(target&&(document.fullscreenElement===target||document.webkitFullscreenElement===target))target.scrollTop=0;else window.scrollTo(0,0);
 }
 function normalReaderHtml(mid,tid,cid,tomo,cap,pages,nav,index,previous,next,totalChapters){return `
 <aside class="reader-toolbar"><div class="toolbar-title">Lectura</div><div class="toolbar-section"><div class="toolbar-label">Tamaño</div><button class="size-btn ${readerSize==='chico'?'active':''}" onclick="setReaderSize('chico')">Chico</button><button class="size-btn ${readerSize==='normal'?'active':''}" onclick="setReaderSize('normal')">Normal</button><button class="size-btn ${readerSize==='grande'?'active':''}" onclick="setReaderSize('grande')">Grande</button><button class="size-btn ${readerSize==='muy-grande'?'active':''}" onclick="setReaderSize('muy-grande')">Muy grande</button></div><div class="toolbar-section"><div class="toolbar-label">Ancho</div><button class="width-btn ${readerWidth==='estrecho'?'active':''}" onclick="setReaderWidth('estrecho')">Estrecho</button><button class="width-btn ${readerWidth==='normal'?'active':''}" onclick="setReaderWidth('normal')">Normal</button><button class="width-btn ${readerWidth==='gordo'?'active':''}" onclick="setReaderWidth('gordo')">Gordo</button><button class="width-btn ${readerWidth==='muy-gordo'?'active':''}" onclick="setReaderWidth('muy-gordo')">Muy gordo</button></div><div class="toolbar-section toolbar-fullscreen"><button id="fullscreenBtn" class="fullscreen-btn" onclick="toggleFullscreen()">⛶ Pantalla completa</button></div><div class="toolbar-section"><button class="reader-book-switch" onclick="readerMode='libro';localStorage.setItem('lfm_reader_mode','libro');openBookChapter('${mid}','${tid}','${cid}',${tomo},${cap})">📕 Modo Libro</button></div></aside>
-<div class="chapter-reader-content"><button class="back" onclick="openTomo('${mid}','${tid}',${tomo})">← Volver al tomo</button><div class="reader-header reader-meta-top"><div class="reader-meta-title-row"><div class="reader-meta-name">${escapeHtml(nav.mangaName)}</div><button id="reader-eye-toggle" class="reader-eye-toggle" type="button" onclick="toggleReaderControls()" aria-label="${readerControlsHidden?'Mostrar menú':'Ocultar menú'}" title="${readerControlsHidden?'Mostrar menú':'Ocultar menú'}">${readerControlsHidden?eyeClosedIcon():eyeOpenIcon()}</button></div><div class="reader-meta-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div></div><button class="reader-side-nav reader-side-prev ${previous?'':'disabled'}" ${previous?`onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"`:'disabled'} aria-label="Capítulo anterior">‹</button><button class="reader-side-nav reader-side-next ${next?'':'disabled'}" ${next?`onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"`:'disabled'} aria-label="Capítulo siguiente">›</button><div class="reader-wrap"><div id="reader" class="reader size-${readerSize} width-${readerWidth}">${pages.map(p=>`<img loading="lazy" src="${escapeHtml(p.imagen_url)}" alt="Página ${escapeHtml(String(p.numero))}" data-page-number="${p.numero}">`).join('')||'<div class="empty">Este capítulo no tiene páginas.</div>'}</div></div><div class="chapter-bottom-nav"><button class="chapter-nav-btn ${previous?'':'disabled'}" ${previous?`onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"`:'disabled'}>‹</button><div class="chapter-info"><div class="chapter-manga-name">${escapeHtml(nav.mangaName)}</div><div class="chapter-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div><div class="chapter-counter">Capítulo ${index>=0?index+1:escapeHtml(String(cap))} de ${totalChapters}</div></div><button class="chapter-nav-btn ${next?'':'disabled'}" ${next?`onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"`:'disabled'}>›</button></div><div id="chapter-end-prompt" class="chapter-end-prompt" aria-live="polite"><button class="chapter-end-arrow chapter-end-prev ${previous?'':'disabled'}" ${previous?`onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"`:'disabled'}>‹</button><div class="chapter-end-info"><div class="chapter-end-manga">${escapeHtml(nav.mangaName)}</div><div class="chapter-end-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div></div><button class="chapter-end-arrow chapter-end-next ${next?'':'disabled'}" ${next?`onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"`:'disabled'}>›</button></div></div>`;}
+<div class="chapter-reader-content"><button class="back" onclick="openTomo('${mid}','${tid}',${tomo})">← Volver al tomo</button><div class="reader-header reader-meta-top"><div class="reader-meta-title-row"><div class="reader-meta-name">${escapeHtml(nav.mangaName)}</div><button id="reader-eye-toggle" class="reader-eye-toggle" type="button" onclick="toggleReaderControls()" aria-label="${readerControlsHidden?'Mostrar menú':'Ocultar menú'}" title="${readerControlsHidden?'Mostrar menú':'Ocultar menú'}">${readerControlsHidden?eyeClosedIcon():eyeOpenIcon()}</button></div><div class="reader-meta-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div></div><button class="reader-side-nav reader-side-prev ${previous?'':'disabled'}" ${previous?`onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"`:'disabled'} aria-label="Capítulo anterior">‹</button><button class="reader-side-nav reader-side-next ${next?'':'disabled'}" ${next?`onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"`:'disabled'} aria-label="Capítulo siguiente">›</button><div class="reader-wrap"><div id="reader" class="reader size-${readerSize} width-${readerWidth}">${pages.map(p=>`<img loading="lazy" src="${escapeHtml(p.imagen_url)}" alt="Página ${escapeHtml(String(p.numero))}" data-page-number="${p.numero}">`).join('')||'<div class="empty">Este capítulo no tiene páginas.</div>'}</div></div><div class="chapter-bottom-nav"><button class="chapter-nav-btn ${previous?'':'disabled'}" ${previous?`onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"`:'disabled'}>‹</button><div class="chapter-info"><div class="chapter-manga-name">${escapeHtml(nav.mangaName)}</div><div class="chapter-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div><div class="chapter-counter">Capítulo ${index>=0?index+1:escapeHtml(String(cap))} de ${totalChapters}</div></div><button class="chapter-nav-btn ${next?'':'disabled'}" ${next?`onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"`:'disabled'}>›</button></div><div id="chapter-end-prompt" class="chapter-end-prompt" aria-live="polite"><button class="chapter-end-arrow chapter-end-prev ${previous?'':'disabled'}" ${previous?`onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"`:'disabled'}>‹</button><div class="chapter-end-info"><div class="chapter-end-manga">${escapeHtml(nav.mangaName)}</div><div class="chapter-end-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div></div><button class="chapter-end-arrow chapter-end-next ${next?'':'disabled'}" ${next?`onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"`:'disabled'}>›</button></div>
+${socialPanelHtml(cid)}
+</div>`;}
 
-function setupChapterEndPrompt(target){if(!target)return;if(target._endPromptCleanup)target._endPromptCleanup();const prompt=target.querySelector('#chapter-end-prompt');if(!prompt)return;const isFullscreen=()=>document.fullscreenElement===target||document.webkitFullscreenElement===target;const getScrollMetrics=()=>isFullscreen()?{top:target.scrollTop,height:target.scrollHeight,view:target.clientHeight}:{top:window.scrollY,height:document.documentElement.scrollHeight,view:window.innerHeight};const check=()=>{const m=getScrollMetrics(),nearBottom=(m.top+m.view)>=m.height-70,showEndPrompt=nearBottom&&readerControlsHidden;prompt.classList.toggle('show',showEndPrompt);target.classList.toggle('chapter-at-end',showEndPrompt);target.querySelectorAll('.reader-side-nav').forEach(el=>el.style.display=showEndPrompt?'none':'');const bottom=target.querySelector('.chapter-bottom-nav');if(bottom)bottom.style.display=showEndPrompt?'none':'';prompt.style.display=showEndPrompt?'flex':'';};const onWindowScroll=()=>{if(!isFullscreen())check()},onTargetScroll=()=>{if(isFullscreen())check()};window.addEventListener('scroll',onWindowScroll,{passive:true});target.addEventListener('scroll',onTargetScroll,{passive:true});window.addEventListener('resize',check,{passive:true});target._checkChapterEnd=check;target._endPromptCleanup=()=>{window.removeEventListener('scroll',onWindowScroll);target.removeEventListener('scroll',onTargetScroll);window.removeEventListener('resize',check)};check();}
+function setupChapterEndPrompt(target,mangaId,chapterId){if(!target)return;if(target._endPromptCleanup)target._endPromptCleanup();const prompt=target.querySelector('#chapter-end-prompt');if(!prompt)return;const isFullscreen=()=>document.fullscreenElement===target||document.webkitFullscreenElement===target;const getScrollMetrics=()=>isFullscreen()?{top:target.scrollTop,height:target.scrollHeight,view:target.clientHeight}:{top:window.scrollY,height:document.documentElement.scrollHeight,view:window.innerHeight};const check=()=>{const m=getScrollMetrics(),nearBottom=(m.top+m.view)>=m.height-120;if(nearBottom&&chapterId)markChapterRead(chapterId,mangaId);const showEndPrompt=nearBottom&&readerControlsHidden;prompt.classList.toggle('show',showEndPrompt);target.classList.toggle('chapter-at-end',showEndPrompt);target.querySelectorAll('.reader-side-nav').forEach(el=>el.style.display=showEndPrompt?'none':'');const bottom=target.querySelector('.chapter-bottom-nav');if(bottom)bottom.style.display=showEndPrompt?'none':'';prompt.style.display=showEndPrompt?'flex':'';};const onWindowScroll=()=>{if(!isFullscreen())check()},onTargetScroll=()=>{if(isFullscreen())check()};window.addEventListener('scroll',onWindowScroll,{passive:true});target.addEventListener('scroll',onTargetScroll,{passive:true});window.addEventListener('resize',check,{passive:true});target._checkChapterEnd=check;target._endPromptCleanup=()=>{window.removeEventListener('scroll',onWindowScroll);target.removeEventListener('scroll',onTargetScroll);window.removeEventListener('resize',check)};check();}
 function eyeOpenIcon(){return '<svg class="eye-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>'}
 function eyeClosedIcon(){return '<svg class="eye-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M4.5 9.5C6.3 7.4 8.8 6 12 6c6.5 0 10 6 10 6-.9 1.5-2.1 2.8-3.5 3.8M4.5 9.5C3 10.7 2 12 2 12s3.5 6 10 6c1.3 0 2.5-.2 3.6-.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'}
 function updateEyeButton(){const btn=document.getElementById('reader-eye-toggle');if(!btn)return;btn.innerHTML=readerControlsHidden?eyeClosedIcon():eyeOpenIcon();btn.setAttribute('aria-label',readerControlsHidden?'Mostrar menú':'Ocultar menú');btn.setAttribute('title',readerControlsHidden?'Mostrar menú':'Ocultar menú');btn.classList.toggle('closed',readerControlsHidden);}
@@ -550,17 +724,39 @@ function renderBook(){
 
 function setBookIndex(index,direction){
   const s=bookState;if(!s)return false;
+  const prevIndex=s.index;
   const next=Math.max(0,Math.min(index,s.items.length-1));
   if(next===s.index)return false;
+  const prevItem=getBookItem(s,prevIndex);
   s.index=next;
   s.animDirection=direction;
   const currCh=bookIndexToChapter(s.book,s.index)?.chapterId||null;
-  const prevCh=bookIndexToChapter(s.book,s.index-(direction==='next'?2:1))?.chapterId||null;
-  s.chapterFlash=currCh!==prevCh;
+  const prevCh=bookIndexToChapter(s.book,prevIndex)?.chapterId||null;
+  s.chapterFlash=!!(currCh&&prevCh&&currCh!==prevCh);
   saveBookProgress();
   renderBook();
-  // Precarga inmediata de las siguientes páginas al cambiar de página
   preloadBookNeighbors();
+  // Capítulo terminado al pasar al siguiente o al quedar en la última página del capítulo
+  if(direction==='next'&&prevCh&&currCh&&prevCh!==currCh){
+    markChapterRead(prevCh,s.mid);
+  }
+  const curItem=getBookItem(s,s.index);
+  if(curItem?.type==='page'){
+    const after=getBookItem(s,s.index+1);
+    const after2=getBookItem(s,s.index+2);
+    const noMoreInChapter=!(after?.type==='page'&&after.chapterId===curItem.chapterId)
+      && !(after2?.type==='page'&&after2.chapterId===curItem.chapterId);
+    // también si el spread actual incluye la última página (izquierda)
+    const left=getBookItem(s,s.index+1);
+    if(left?.type==='page'&&left.chapterId===curItem.chapterId){
+      const afterLeft=getBookItem(s,s.index+2);
+      if(!(afterLeft?.type==='page'&&afterLeft.chapterId===curItem.chapterId)){
+        markChapterRead(curItem.chapterId,s.mid);
+      }
+    }else if(noMoreInChapter){
+      markChapterRead(curItem.chapterId,s.mid);
+    }
+  }
   if(s.chapterFlash){
     window.setTimeout(()=>{if(bookState===s){s.chapterFlash=false;renderBook();}},700);
   }
@@ -896,4 +1092,11 @@ window.addEventListener('unhandledrejection', e => {
   console.error('LeeMangasCross:', e.reason);
 });
 
-loadMangas();
+(async function boot(){
+  try{
+    await initReaderAuth();
+  }catch(e){
+    console.warn('LeeMangasCross: auth anónima no disponible aún', e);
+  }
+  loadMangas();
+})();

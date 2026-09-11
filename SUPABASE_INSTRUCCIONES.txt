@@ -1,0 +1,31 @@
+QUE HACER EN SUPABASE (LeeMangasCross — social)
+================================================
+
+1) Activar cuentas anónimas
+   - Entra a tu proyecto Supabase
+   - Authentication → Providers → Anonymous Sign-Ins
+   - Activa "Enable Anonymous Sign-Ins"
+   - Save
+
+2) Crear tablas y permisos
+   - SQL Editor → New query
+   - Pega el contenido de SUPABASE_SOCIAL.sql
+   - Run (ejecutar)
+
+3) Comprobar
+   - Table Editor debería mostrar:
+     • chapter_reactions
+     • chapter_comments
+     • chapter_reads
+   - Authentication → Users: al abrir el lector público aparecerá un usuario anónimo
+
+4) Cómo funciona en la web pública
+   - Al entrar se crea (o restaura) una sesión anónima en el navegador
+   - En cada capítulo: 👍 / 👎 y comentarios
+   - Si terminas un capítulo (llegas al final), aparece un ✓ junto al capítulo en la lista
+   - La sesión se guarda en localStorage (mismo navegador = mismo usuario anónimo)
+
+5) Si algo falla
+   - Abre la consola del navegador (F12)
+   - Si dice que no hay sesión anónima: revisa el paso 1
+   - Si error de RLS / permission: vuelve a ejecutar el SQL del paso 2
