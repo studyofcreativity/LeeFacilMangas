@@ -863,46 +863,71 @@ function bookSpreadForState(state){
 }
 
 
-/** Aplica zoom/cámara a la página activa con estilos en línea (no lo anula el CSS). */
+/** Zoom a la página activa. Con menú oculto el zoom es mucho más grande. */
 function applyBookPageFocus(){
   const s=bookState;
   if(!s)return;
   const reader=document.getElementById('book-reader');
   const stage=document.querySelector('.book-stage');
   const spread=document.querySelector('.book-spread.book-spread-pair');
+  const topbar=document.querySelector('.book-topbar');
+  const bottom=document.querySelector('.book-bottom');
   if(!stage||!spread)return;
   const left=spread.querySelector('.book-sheet[data-side="left"]');
   const right=spread.querySelector('.book-sheet[data-side="right"]');
   if(!left||!right)return;
+
   if(window.innerWidth<700){
-    [left,right].forEach(el=>{ el.style.cssText=''; });
-    spread.style.cssText='';
-    stage.style.cssText='';
+    [left,right,spread,stage].forEach(el=>{ if(el) el.style.cssText=''; });
     return;
   }
 
-  const menuHidden=!!(
-    s.controlsHidden ||
-    document.body.classList.contains('book-controls-hidden') ||
-    reader?.classList.contains('book-controls-hidden')
-  );
+  const menuHidden=!!(s.controlsHidden);
 
-  // Con menú oculto: zoom más grande, sin salirse de la pantalla
-  const activePct=menuHidden ? 90 : 76;
+  // Diferencia bien visible:
+  // menú visible  → activa 70% / otra 30%
+  // menú oculto   → activa 94% / otra 6%  (+ casi pantalla completa)
+  const activePct=menuHidden ? 94 : 70;
   const otherPct=100-activePct;
 
   const focus=(s.pageFocus==='left')?'left':'right';
   const active=focus==='left'?left:right;
   const other=focus==='left'?right:left;
 
-  // Altura del escenario: casi toda la ventana si el menú está oculto
-  const stageH=menuHidden
-    ? 'calc(100vh - 8px)'
-    : 'calc(100vh - 142px)';
+  // Topbar/bottom: no restar altura cuando el menú está oculto
+  if(topbar){
+    if(menuHidden){
+      topbar.style.setProperty('height','0','important');
+      topbar.style.setProperty('min-height','0','important');
+      topbar.style.setProperty('padding','0','important');
+      topbar.style.setProperty('overflow','visible','important');
+      topbar.style.setProperty('position','absolute','important');
+      topbar.style.setProperty('top','8px','important');
+      topbar.style.setProperty('left','8px','important');
+      topbar.style.setProperty('z-index','30','important');
+      topbar.style.setProperty('width','auto','important');
+      topbar.style.setProperty('background','transparent','important');
+      topbar.style.setProperty('border','0','important');
+    }else{
+      topbar.style.cssText='';
+    }
+  }
+  if(bottom){
+    if(menuHidden){
+      bottom.style.setProperty('display','none','important');
+      bottom.style.setProperty('height','0','important');
+    }else{
+      bottom.style.cssText='';
+    }
+  }
+
+  const stageH=menuHidden ? '100vh' : 'calc(100vh - 142px)';
   stage.style.setProperty('min-height', stageH, 'important');
   stage.style.setProperty('height', stageH, 'important');
-  stage.style.setProperty('padding', menuHidden ? '4px 8px' : '', 'important');
+  stage.style.setProperty('max-height', stageH, 'important');
+  stage.style.setProperty('padding', menuHidden ? '0' : '', 'important');
   stage.style.setProperty('overflow', 'hidden', 'important');
+  stage.style.setProperty('box-sizing', 'border-box', 'important');
 
   spread.style.setProperty('display','flex','important');
   spread.style.setProperty('flex-direction','row','important');
@@ -915,8 +940,9 @@ function applyBookPageFocus(){
   spread.style.setProperty('transform','none','important');
   spread.style.setProperty('overflow','hidden','important');
   spread.style.setProperty('box-sizing','border-box','important');
+  spread.style.setProperty('margin','0','important');
 
-  const sheetCommon=(el, isActive)=>{
+  const applySheet=(el, isActive)=>{
     el.style.setProperty('display','flex','important');
     el.style.setProperty('align-items','center','important');
     el.style.setProperty('justify-content','center','important');
@@ -925,7 +951,7 @@ function applyBookPageFocus(){
     el.style.setProperty('max-height','100%','important');
     el.style.setProperty('overflow','hidden','important');
     el.style.setProperty('box-sizing','border-box','important');
-    el.style.setProperty('transition','flex .3s ease,width .3s ease,max-width .3s ease,opacity .25s ease,filter .25s ease','important');
+    el.style.setProperty('transition','flex .28s ease,width .28s ease,max-width .28s ease,opacity .22s ease,filter .22s ease','important');
     if(isActive){
       el.style.setProperty('flex', activePct+' 1 0%','important');
       el.style.setProperty('width', activePct+'%','important');
@@ -937,8 +963,8 @@ function applyBookPageFocus(){
       el.style.setProperty('flex', otherPct+' 1 0%','important');
       el.style.setProperty('width', otherPct+'%','important');
       el.style.setProperty('max-width', otherPct+'%','important');
-      el.style.setProperty('opacity', menuHidden ? '0.22' : '0.32','important');
-      el.style.setProperty('filter', menuHidden ? 'brightness(0.35)' : 'brightness(0.45)','important');
+      el.style.setProperty('opacity', menuHidden ? '0.12' : '0.35','important');
+      el.style.setProperty('filter', menuHidden ? 'brightness(0.25)' : 'brightness(0.5)','important');
       el.style.setProperty('z-index','1','important');
     }
     const img=el.querySelector('img');
@@ -948,11 +974,18 @@ function applyBookPageFocus(){
       img.style.setProperty('width','auto','important');
       img.style.setProperty('height','auto','important');
       img.style.setProperty('object-fit','contain','important');
+      // Ligero zoom extra en la imagen activa con menú oculto (sin salirse: max 100%)
+      if(isActive && menuHidden){
+        img.style.setProperty('transform','scale(1)','important');
+      }else{
+        img.style.setProperty('transform','none','important');
+      }
     }
   };
-  sheetCommon(active, true);
-  sheetCommon(other, false);
+  applySheet(active, true);
+  applySheet(other, false);
 }
+
 
 function renderBook(){
   const s=bookState;if(!s) return;
@@ -1406,9 +1439,15 @@ async function openBookUI(mid,tid,book,start,opts={}){
   }catch(e){}
 }
 
-function toggleBookControls(){/* focus zoom refresh after */if(!bookState)return;bookState.controlsHidden=!bookState.controlsHidden;renderBook();
-  if(bookState){applyBookPageFocus();}
+function toggleBookControls(){
+  if(!bookState)return;
+  bookState.controlsHidden=!bookState.controlsHidden;
+  renderBook();
+  // Segundo tick por si el layout aún no midió alturas
+  requestAnimationFrame(()=>{ applyBookPageFocus(); });
+  setTimeout(()=>applyBookPageFocus(), 50);
 }
+
 async function toggleBookFullscreen(){const p=document.querySelector('.book-reader-page');if(!p)return;try{if(!document.fullscreenElement){if(p.requestFullscreen)await p.requestFullscreen();else if(p.webkitRequestFullscreen)p.webkitRequestFullscreen();}else if(document.exitFullscreen)await document.exitFullscreen();}catch(e){console.error(e)}}
 
 document.addEventListener('keydown',e=>{

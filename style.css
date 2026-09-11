@@ -1392,3 +1392,38 @@ body.reader-mode.reader-controls-hidden .social-bar-inline{
     filter:none !important;
   }
 }
+
+/* Menú oculto: maximizar área de lectura */
+body.book-controls-hidden .book-topbar,
+.book-controls-hidden .book-topbar{
+  height:0 !important;
+  min-height:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  background:transparent !important;
+  pointer-events:none;
+}
+body.book-controls-hidden .book-topbar .book-eye,
+.book-controls-hidden .book-topbar .book-eye{
+  pointer-events:auto !important;
+  position:fixed !important;
+  top:10px !important;
+  left:10px !important;
+  z-index:50 !important;
+}
+body.book-controls-hidden .book-bottom,
+.book-controls-hidden .book-bottom{
+  display:none !important;
+  height:0 !important;
+}
+body.book-controls-hidden .book-stage,
+.book-controls-hidden .book-stage{
+  min-height:100vh !important;
+  height:100vh !important;
+  padding:0 !important;
+}
+body.book-controls-hidden .book-spread,
+.book-controls-hidden .book-spread{
+  height:100vh !important;
+  max-height:100vh !important;
+}
