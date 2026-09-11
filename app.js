@@ -862,6 +862,56 @@ function bookSpreadForState(state){
   return {desktop:false,left:null,right:only,single:true,rightIndex:rightOk?rightIndex:state.index,leftIndex:null};
 }
 
+
+/** Aplica zoom/cámara a la página activa con estilos en línea (no lo anula el CSS). */
+function applyBookPageFocus(){
+  const s=bookState;
+  if(!s)return;
+  const stage=document.querySelector('.book-stage');
+  const spread=document.querySelector('.book-spread.book-spread-pair');
+  if(!stage||!spread)return;
+  const left=spread.querySelector('.book-sheet[data-side="left"]');
+  const right=spread.querySelector('.book-sheet[data-side="right"]');
+  if(!left||!right)return;
+  if(window.innerWidth<700){
+    [left,right].forEach(el=>{
+      el.style.cssText='';
+    });
+    return;
+  }
+  const focus=(s.pageFocus==='left')?'left':'right';
+  const active=focus==='left'?left:right;
+  const other=focus==='left'?right:left;
+
+  // Página activa: grande y centrada visualmente
+  active.style.setProperty('flex','3 1 0%','important');
+  active.style.setProperty('width','78%','important');
+  active.style.setProperty('max-width','78%','important');
+  active.style.setProperty('min-width','0','important');
+  active.style.setProperty('opacity','1','important');
+  active.style.setProperty('filter','none','important');
+  active.style.setProperty('z-index','3','important');
+  active.style.setProperty('transition','flex .3s ease,width .3s ease,max-width .3s ease,opacity .25s ease,filter .25s ease','important');
+
+  // Página inactiva: franja lateral
+  other.style.setProperty('flex','1 1 0%','important');
+  other.style.setProperty('width','22%','important');
+  other.style.setProperty('max-width','22%','important');
+  other.style.setProperty('min-width','0','important');
+  other.style.setProperty('opacity','0.32','important');
+  other.style.setProperty('filter','brightness(0.45)','important');
+  other.style.setProperty('z-index','1','important');
+  other.style.setProperty('transition','flex .3s ease,width .3s ease,max-width .3s ease,opacity .25s ease,filter .25s ease','important');
+
+  // Asegurar contenedor flex
+  spread.style.setProperty('display','flex','important');
+  spread.style.setProperty('flex-direction','row','important');
+  spread.style.setProperty('align-items','stretch','important');
+  spread.style.setProperty('width','100%','important');
+  spread.style.setProperty('max-width','100%','important');
+  spread.style.setProperty('transform','none','important');
+}
+
 function renderBook(){
   const s=bookState;if(!s) return;
 
@@ -926,14 +976,18 @@ function renderBook(){
   const direction=s.animDirection;
   s.animDirection='';
   preloadBookNeighbors();
-  // Importante: al terminar el flip, quitar la clase o las páginas quedan en opacity:0
+  // Zoom/cámara a la página activa (estilos en línea)
+  applyBookPageFocus();
   const spreadEl=reader.querySelector('.book-spread');
   if(direction && spreadEl){
     window.setTimeout(()=>{
       if(spreadEl.isConnected){
         spreadEl.classList.remove('book-flip-next','book-flip-prev');
       }
-      if(bookState===s) preloadBookNeighbors();
+      if(bookState===s){
+        applyBookPageFocus();
+        preloadBookNeighbors();
+      }
     }, 560);
   }
 }
