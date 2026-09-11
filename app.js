@@ -867,6 +867,7 @@ function bookSpreadForState(state){
 function applyBookPageFocus(){
   const s=bookState;
   if(!s)return;
+  const reader=document.getElementById('book-reader');
   const stage=document.querySelector('.book-stage');
   const spread=document.querySelector('.book-spread.book-spread-pair');
   if(!stage||!spread)return;
@@ -874,42 +875,83 @@ function applyBookPageFocus(){
   const right=spread.querySelector('.book-sheet[data-side="right"]');
   if(!left||!right)return;
   if(window.innerWidth<700){
-    [left,right].forEach(el=>{
-      el.style.cssText='';
-    });
+    [left,right].forEach(el=>{ el.style.cssText=''; });
+    spread.style.cssText='';
+    stage.style.cssText='';
     return;
   }
+
+  const menuHidden=!!(
+    s.controlsHidden ||
+    document.body.classList.contains('book-controls-hidden') ||
+    reader?.classList.contains('book-controls-hidden')
+  );
+
+  // Con menú oculto: zoom más grande, sin salirse de la pantalla
+  const activePct=menuHidden ? 90 : 76;
+  const otherPct=100-activePct;
+
   const focus=(s.pageFocus==='left')?'left':'right';
   const active=focus==='left'?left:right;
   const other=focus==='left'?right:left;
 
-  // Página activa: grande y centrada visualmente
-  active.style.setProperty('flex','3 1 0%','important');
-  active.style.setProperty('width','78%','important');
-  active.style.setProperty('max-width','78%','important');
-  active.style.setProperty('min-width','0','important');
-  active.style.setProperty('opacity','1','important');
-  active.style.setProperty('filter','none','important');
-  active.style.setProperty('z-index','3','important');
-  active.style.setProperty('transition','flex .3s ease,width .3s ease,max-width .3s ease,opacity .25s ease,filter .25s ease','important');
+  // Altura del escenario: casi toda la ventana si el menú está oculto
+  const stageH=menuHidden
+    ? 'calc(100vh - 8px)'
+    : 'calc(100vh - 142px)';
+  stage.style.setProperty('min-height', stageH, 'important');
+  stage.style.setProperty('height', stageH, 'important');
+  stage.style.setProperty('padding', menuHidden ? '4px 8px' : '', 'important');
+  stage.style.setProperty('overflow', 'hidden', 'important');
 
-  // Página inactiva: franja lateral
-  other.style.setProperty('flex','1 1 0%','important');
-  other.style.setProperty('width','22%','important');
-  other.style.setProperty('max-width','22%','important');
-  other.style.setProperty('min-width','0','important');
-  other.style.setProperty('opacity','0.32','important');
-  other.style.setProperty('filter','brightness(0.45)','important');
-  other.style.setProperty('z-index','1','important');
-  other.style.setProperty('transition','flex .3s ease,width .3s ease,max-width .3s ease,opacity .25s ease,filter .25s ease','important');
-
-  // Asegurar contenedor flex
   spread.style.setProperty('display','flex','important');
   spread.style.setProperty('flex-direction','row','important');
   spread.style.setProperty('align-items','stretch','important');
+  spread.style.setProperty('justify-content','center','important');
   spread.style.setProperty('width','100%','important');
   spread.style.setProperty('max-width','100%','important');
+  spread.style.setProperty('height','100%','important');
+  spread.style.setProperty('max-height','100%','important');
   spread.style.setProperty('transform','none','important');
+  spread.style.setProperty('overflow','hidden','important');
+  spread.style.setProperty('box-sizing','border-box','important');
+
+  const sheetCommon=(el, isActive)=>{
+    el.style.setProperty('display','flex','important');
+    el.style.setProperty('align-items','center','important');
+    el.style.setProperty('justify-content','center','important');
+    el.style.setProperty('min-width','0','important');
+    el.style.setProperty('height','100%','important');
+    el.style.setProperty('max-height','100%','important');
+    el.style.setProperty('overflow','hidden','important');
+    el.style.setProperty('box-sizing','border-box','important');
+    el.style.setProperty('transition','flex .3s ease,width .3s ease,max-width .3s ease,opacity .25s ease,filter .25s ease','important');
+    if(isActive){
+      el.style.setProperty('flex', activePct+' 1 0%','important');
+      el.style.setProperty('width', activePct+'%','important');
+      el.style.setProperty('max-width', activePct+'%','important');
+      el.style.setProperty('opacity','1','important');
+      el.style.setProperty('filter','none','important');
+      el.style.setProperty('z-index','3','important');
+    }else{
+      el.style.setProperty('flex', otherPct+' 1 0%','important');
+      el.style.setProperty('width', otherPct+'%','important');
+      el.style.setProperty('max-width', otherPct+'%','important');
+      el.style.setProperty('opacity', menuHidden ? '0.22' : '0.32','important');
+      el.style.setProperty('filter', menuHidden ? 'brightness(0.35)' : 'brightness(0.45)','important');
+      el.style.setProperty('z-index','1','important');
+    }
+    const img=el.querySelector('img');
+    if(img){
+      img.style.setProperty('max-width','100%','important');
+      img.style.setProperty('max-height','100%','important');
+      img.style.setProperty('width','auto','important');
+      img.style.setProperty('height','auto','important');
+      img.style.setProperty('object-fit','contain','important');
+    }
+  };
+  sheetCommon(active, true);
+  sheetCommon(other, false);
 }
 
 function renderBook(){
@@ -1364,7 +1406,9 @@ async function openBookUI(mid,tid,book,start,opts={}){
   }catch(e){}
 }
 
-function toggleBookControls(){if(!bookState)return;bookState.controlsHidden=!bookState.controlsHidden;renderBook();}
+function toggleBookControls(){/* focus zoom refresh after */if(!bookState)return;bookState.controlsHidden=!bookState.controlsHidden;renderBook();
+  if(bookState){applyBookPageFocus();}
+}
 async function toggleBookFullscreen(){const p=document.querySelector('.book-reader-page');if(!p)return;try{if(!document.fullscreenElement){if(p.requestFullscreen)await p.requestFullscreen();else if(p.webkitRequestFullscreen)p.webkitRequestFullscreen();}else if(document.exitFullscreen)await document.exitFullscreen();}catch(e){console.error(e)}}
 
 document.addEventListener('keydown',e=>{
