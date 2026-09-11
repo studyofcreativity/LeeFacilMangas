@@ -884,10 +884,9 @@ function applyBookPageFocus(){
 
   const menuHidden=!!(s.controlsHidden);
 
-  // Diferencia bien visible:
-  // menú visible  → activa 70% / otra 30%
-  // menú oculto   → activa 94% / otra 6%  (+ casi pantalla completa)
-  const activePct=menuHidden ? 94 : 70;
+  // menú visible  → activa ~74% / otra ~26%
+  // menú oculto   → activa ~84% / otra ~16% (un poco más, sin exagerar)
+  const activePct=menuHidden ? 84 : 74;
   const otherPct=100-activePct;
 
   const focus=(s.pageFocus==='left')?'left':'right';
@@ -963,8 +962,8 @@ function applyBookPageFocus(){
       el.style.setProperty('flex', otherPct+' 1 0%','important');
       el.style.setProperty('width', otherPct+'%','important');
       el.style.setProperty('max-width', otherPct+'%','important');
-      el.style.setProperty('opacity', menuHidden ? '0.12' : '0.35','important');
-      el.style.setProperty('filter', menuHidden ? 'brightness(0.25)' : 'brightness(0.5)','important');
+      el.style.setProperty('opacity', menuHidden ? '0.28' : '0.38','important');
+      el.style.setProperty('filter', menuHidden ? 'brightness(0.4)' : 'brightness(0.55)','important');
       el.style.setProperty('z-index','1','important');
     }
     const img=el.querySelector('img');
