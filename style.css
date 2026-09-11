@@ -755,3 +755,28 @@ body.reader-mode.reader-controls-hidden .chapter-reader-page.chapter-at-end .cha
   width:min(100%,860px);
   max-width:100%;
 }
+
+/* Doble página: las dos hojas siempre visibles e iguales */
+.book-stage.book-two-pages .book-spread.book-spread-pair{
+  width:min(100%,1280px);
+  display:flex;
+  flex-direction:row;
+  align-items:stretch;
+  justify-content:center;
+  gap:0;
+}
+.book-stage.book-two-pages .book-spread.book-spread-pair .book-sheet{
+  display:flex !important;
+  width:50% !important;
+  max-width:50% !important;
+  min-width:0;
+  flex:1 1 50%;
+  height:100%;
+}
+.book-stage.book-two-pages .book-spread.book-spread-pair .book-sheet img{
+  width:auto;
+  height:auto;
+  max-width:100%;
+  max-height:100%;
+  object-fit:contain;
+}

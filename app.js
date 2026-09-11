@@ -383,14 +383,8 @@ async function switchTomoAnimated(mid,tid,direction){
   // 6) Se abre solo y pasa a la página 1 (no se queda en la portada)
   await playBookAnim('book-anim-tomo-open',320);
   if(bookState && bookState.items.length>1){
+    // Página 1 del primer capítulo (índice 1 tras la portada) = derecha del primer spread
     bookState.index=1;
-    // Escritorio: asegurar página impar a la derecha
-    const it=getBookItem(bookState,bookState.index);
-    const pr=getBookItem(bookState,bookState.index-1);
-    if(window.innerWidth>=900 && it?.type==='page' && it.page%2===0 && pr?.type==='page' && pr.chapterId===it.chapterId){
-      bookState.index--;
-    }
-    if(bookState.index<1 && bookState.items.length>1) bookState.index=1;
     bookState.animDirection='next';
     renderBook();
     await playBookAnim('book-anim-tomo-open',280);
@@ -448,45 +442,58 @@ function bookSpreadForState(state){
   const wide=window.innerWidth>=900;
   if(!wide) return {desktop:false,left:null,right:item,single:true};
 
-  // Manga (RTL): página impar a la DERECHA, par a la IZQUIERDA.
-  // Solo usamos doble página cuando existe la pareja real en el mismo capítulo.
-  let left=null, right=null;
-  if(item.page%2===1){
-    right=item;
-    const nxt=getBookItem(state,state.index+1);
-    if(nxt?.type==='page' && nxt.chapterId===item.chapterId && Number(nxt.page)===Number(item.page)+1){
-      left=nxt;
-    }
+  // Emparejar por posición dentro del capítulo (0-1, 2-3, ...),
+  // no solo por el número de página: así 1+2 siempre salen juntas.
+  let chapterStart=state.index;
+  while(chapterStart>0){
+    const prev=getBookItem(state,chapterStart-1);
+    if(!prev||prev.type!=='page'||prev.chapterId!==item.chapterId) break;
+    chapterStart--;
+  }
+  const local=state.index-chapterStart; // 0,1,2,... dentro del capítulo
+  let rightIndex, leftIndex;
+  if(local%2===0){
+    // Página "derecha" del spread (1ª, 3ª, 5ª del capítulo)
+    rightIndex=state.index;
+    leftIndex=state.index+1;
   }else{
-    left=item;
-    const prv=getBookItem(state,state.index-1);
-    if(prv?.type==='page' && prv.chapterId===item.chapterId && Number(prv.page)===Number(item.page)-1){
-      right=prv;
-    }else{
-      // Página par sin su impar: mostrar sola centrada
-      right=item;
-      left=null;
-    }
+    // Página "izquierda" del spread (2ª, 4ª, ...)
+    leftIndex=state.index;
+    rightIndex=state.index-1;
   }
 
-  const hasPair=!!(left && right);
-  if(!hasPair){
-    // Una sola página en escritorio: centrada a ancho completo (sin mitad negra)
-    const only=right||left||item;
-    return {desktop:false,left:null,right:only,single:true};
+  const right=getBookItem(state,rightIndex);
+  const left=getBookItem(state,leftIndex);
+  const rightOk=!!(right&&right.type==='page'&&right.chapterId===item.chapterId);
+  const leftOk=!!(left&&left.type==='page'&&left.chapterId===item.chapterId);
+
+  if(rightOk&&leftOk){
+    return {desktop:true,left,right,single:false,rightIndex,leftIndex};
   }
-  return {desktop:true,left,right,single:false};
+
+  // Sin pareja: una sola página centrada
+  const only=rightOk?right:item;
+  return {desktop:false,left:null,right:only,single:true,rightIndex:rightOk?rightIndex:state.index,leftIndex:null};
 }
 
 function renderBook(){
   const s=bookState;if(!s) return;
 
-  // Al volver de móvil a escritorio, normalizamos un cursor que haya quedado
-  // en una página par para que la página impar vuelva a quedar a la derecha.
+  // En escritorio, el cursor del spread debe quedar en la página DERECHA del par
+  // (índice local par dentro del capítulo: 0,2,4...), para mostrar siempre 1+2, 3+4, etc.
   const current=getBookItem(s,s.index);
-  if(window.innerWidth>=900 && current?.type==='page' && current.page%2===0){
-    const prev=getBookItem(s,s.index-1);
-    if(prev?.type==='page' && prev.chapterId===current.chapterId) s.index--;
+  if(window.innerWidth>=900 && current?.type==='page'){
+    let chapterStart=s.index;
+    while(chapterStart>0){
+      const prev=getBookItem(s,chapterStart-1);
+      if(!prev||prev.type!=='page'||prev.chapterId!==current.chapterId) break;
+      chapterStart--;
+    }
+    const local=s.index-chapterStart;
+    if(local%2===1){
+      // Estamos en la página izquierda del par → retroceder a la derecha
+      s.index=s.index-1;
+    }
   }
 
   const spread=bookSpreadForState(s);
@@ -575,22 +582,28 @@ async function bookNext(){
   if(!item)return;
 
   if(window.innerWidth>=900){
-    // Si el cursor se encuentra en una página par por una transición de layout,
-    // primero se coloca en la pareja correcta.
-    if(item.page%2===0){
-      setBookIndex(s.index+1,'next');
-      return;
-    }
-    const afterPair=getBookItem(s,s.index+2);
-    if(afterPair?.type==='page' && afterPair.chapterId===item.chapterId){
-      setBookIndex(s.index+2,'next');
-      return;
-    }
-    // Fin del capítulo -> primera página del siguiente capítulo.
-    const nextChapterIndex=s.items.findIndex((x,i)=>i>s.index && x.type==='page' && x.chapterId!==item.chapterId);
-    if(nextChapterIndex>0){
-      setBookIndex(nextChapterIndex,'next');
-      return;
+    // Avanzar un spread completo (2 páginas del mismo capítulo si existen)
+    const nxt=getBookItem(s,s.index+1);
+    const nxt2=getBookItem(s,s.index+2);
+    // Si hay pareja (derecha actual + izquierda siguiente), saltar a la siguiente derecha
+    if(nxt?.type==='page' && nxt.chapterId===item.chapterId){
+      if(nxt2?.type==='page' && nxt2.chapterId===item.chapterId){
+        setBookIndex(s.index+2,'next');
+        return;
+      }
+      // Solo había una página más en el capítulo (la izquierda): ir a siguiente capítulo
+      const nextChapterIndex=s.items.findIndex((x,i)=>i>s.index && x.type==='page' && x.chapterId!==item.chapterId);
+      if(nextChapterIndex>0){
+        setBookIndex(nextChapterIndex,'next');
+        return;
+      }
+    }else{
+      // Página suelta al final del capítulo → siguiente capítulo
+      const nextChapterIndex=s.items.findIndex((x,i)=>i>s.index && x.type==='page' && x.chapterId!==item.chapterId);
+      if(nextChapterIndex>0){
+        setBookIndex(nextChapterIndex,'next');
+        return;
+      }
     }
   }else{
     if(s.index<s.items.length-1){
@@ -629,21 +642,41 @@ async function bookPrev(){
   if(!item)return;
 
   if(window.innerWidth>=900){
-    if(item.page%2===0){
+    // Retroceder un spread: a la pareja anterior del mismo capítulo, o capítulo previo
+    if(s.index<=1){
+      // Portada o primera página
+      setBookIndex(0,'prev');
+      return;
+    }
+    const prev=getBookItem(s,s.index-1);
+    const prev2=getBookItem(s,s.index-2);
+    if(prev?.type==='page' && prev.chapterId===item.chapterId){
+      // Hay página izquierda del spread actual → la derecha del spread anterior es index-2
+      if(prev2?.type==='page' && prev2.chapterId===item.chapterId){
+        setBookIndex(s.index-2,'prev');
+        return;
+      }
       setBookIndex(Math.max(1,s.index-1),'prev');
       return;
     }
-    if(item.page>2){
-      setBookIndex(s.index-2,'prev');
-      return;
-    }
-    // Página 1 de un capítulo: vuelve a la portada si es el primer capítulo,
-    // o a la última página (pareja) del capítulo anterior.
-    // renderBook corrige automáticamente si caemos en una página par.
-    const prevItem=getBookItem(s,s.index-1);
-    if(prevItem?.type==='page'&&prevItem.chapterId!==item.chapterId){
-      setBookIndex(Math.max(1,s.index-1),'prev');
-      return;
+    // Cambio de capítulo: ir a la última "derecha" del capítulo anterior
+    let i=s.index-1;
+    while(i>0){
+      const x=getBookItem(s,i);
+      if(x?.type==='page' && x.chapterId!==item.chapterId){
+        // Alinear a índice local par dentro de ese capítulo
+        let cs=i;
+        while(cs>0){
+          const p=getBookItem(s,cs-1);
+          if(!p||p.type!=='page'||p.chapterId!==x.chapterId) break;
+          cs--;
+        }
+        const local=i-cs;
+        if(local%2===1) i=i-1;
+        setBookIndex(Math.max(1,i),'prev');
+        return;
+      }
+      i--;
     }
     setBookIndex(0,'prev');
     return;
@@ -742,11 +775,16 @@ async function openBookUI(mid,tid,book,start,opts={}){
     imageCache:bookState?.imageCache instanceof Map ? bookState.imageCache : new Map()
   };
 
-  // En escritorio, nunca arrancamos en una página par como derecha.
+  // En escritorio, alinear al índice local par (página derecha del spread).
   const initial=getBookItem(bookState,bookState.index);
-  const prev=getBookItem(bookState,bookState.index-1);
-  if(window.innerWidth>=900 && initial?.type==='page' && initial.page%2===0 && prev?.type==='page'&&prev.chapterId===initial.chapterId){
-    bookState.index--;
+  if(window.innerWidth>=900 && initial?.type==='page'){
+    let cs=bookState.index;
+    while(cs>0){
+      const p=getBookItem(bookState,cs-1);
+      if(!p||p.type!=='page'||p.chapterId!==initial.chapterId) break;
+      cs--;
+    }
+    if((bookState.index-cs)%2===1) bookState.index--;
   }
 
   document.body.classList.add('reader-mode','book-mode');
