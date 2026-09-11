@@ -442,16 +442,40 @@ function renderBookPage(item,state,side){
 
 function bookSpreadForState(state){
   const item=getBookItem(state,state.index);
-  if(!item) return {desktop:false,left:null,right:null};
-  if(item.type==='cover') return {desktop:false,left:null,right:item};
-  const desktop=window.innerWidth>=900;
-  if(!desktop) return {desktop:false,left:null,right:item};
+  if(!item) return {desktop:false,left:null,right:null,single:true};
+  if(item.type==='cover') return {desktop:false,left:null,right:item,single:true};
 
-  // Una pareja N/N+1 jamás cruza de capítulo.
-  const next=getBookItem(state,state.index+1);
-  const right=item.page%2===1 ? item : getBookItem(state,state.index-1);
-  const left=(right && next && next.type==='page' && next.chapterId===right.chapterId && next.page===right.page+1) ? next : null;
-  return {desktop:true,left,right};
+  const wide=window.innerWidth>=900;
+  if(!wide) return {desktop:false,left:null,right:item,single:true};
+
+  // Manga (RTL): página impar a la DERECHA, par a la IZQUIERDA.
+  // Solo usamos doble página cuando existe la pareja real en el mismo capítulo.
+  let left=null, right=null;
+  if(item.page%2===1){
+    right=item;
+    const nxt=getBookItem(state,state.index+1);
+    if(nxt?.type==='page' && nxt.chapterId===item.chapterId && Number(nxt.page)===Number(item.page)+1){
+      left=nxt;
+    }
+  }else{
+    left=item;
+    const prv=getBookItem(state,state.index-1);
+    if(prv?.type==='page' && prv.chapterId===item.chapterId && Number(prv.page)===Number(item.page)-1){
+      right=prv;
+    }else{
+      // Página par sin su impar: mostrar sola centrada
+      right=item;
+      left=null;
+    }
+  }
+
+  const hasPair=!!(left && right);
+  if(!hasPair){
+    // Una sola página en escritorio: centrada a ancho completo (sin mitad negra)
+    const only=right||left||item;
+    return {desktop:false,left:null,right:only,single:true};
+  }
+  return {desktop:true,left,right,single:false};
 }
 
 function renderBook(){
@@ -486,10 +510,10 @@ function renderBook(){
       <div class="book-title">${escapeHtml(s.mangaName)}<small>${escapeHtml(chapterMeta)}</small></div>
       <button class="book-full" onclick="toggleBookFullscreen()">⛶</button>
     </div>
-    <div class="book-stage ${spread.desktop?'book-two-pages':''}">
+    <div class="book-stage ${spread.desktop?'book-two-pages':''}${spread.single?' book-stage-single':''}">
       <button class="book-arrow book-arrow-left ${nextVisible?'':'disabled'}" onclick="bookNext()" ${nextVisible?'':'disabled'} aria-label="Página siguiente">‹</button>
-      <div class="book-spread ${nextClass}">
-        ${spread.desktop?renderBookPage(spread.left,s,'left'):''}
+      <div class="book-spread ${spread.desktop?'book-spread-pair':''} ${nextClass}">
+        ${spread.desktop&&spread.left?renderBookPage(spread.left,s,'left'):''}
         ${renderBookPage(spread.right,s,'right')}
       </div>
       <button class="book-arrow book-arrow-right ${prevVisible?'':'disabled'}" onclick="bookPrev()" ${prevVisible?'':'disabled'} aria-label="Página anterior">›</button>
