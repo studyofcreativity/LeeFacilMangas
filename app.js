@@ -863,128 +863,54 @@ function bookSpreadForState(state){
 }
 
 
-/** Zoom a la página activa. Con menú oculto el zoom es mucho más grande. */
+/** Aplica zoom/cámara a la página activa con estilos en línea (no lo anula el CSS). */
 function applyBookPageFocus(){
   const s=bookState;
   if(!s)return;
-  const reader=document.getElementById('book-reader');
   const stage=document.querySelector('.book-stage');
   const spread=document.querySelector('.book-spread.book-spread-pair');
-  const topbar=document.querySelector('.book-topbar');
-  const bottom=document.querySelector('.book-bottom');
   if(!stage||!spread)return;
   const left=spread.querySelector('.book-sheet[data-side="left"]');
   const right=spread.querySelector('.book-sheet[data-side="right"]');
   if(!left||!right)return;
-
   if(window.innerWidth<700){
-    [left,right,spread,stage].forEach(el=>{ if(el) el.style.cssText=''; });
+    [left,right].forEach(el=>{
+      el.style.cssText='';
+    });
     return;
   }
-
-  const menuHidden=!!(s.controlsHidden);
-
-  // menú visible  → activa ~74% / otra ~26%
-  // menú oculto   → activa ~84% / otra ~16% (un poco más, sin exagerar)
-  const activePct=menuHidden ? 84 : 74;
-  const otherPct=100-activePct;
-
   const focus=(s.pageFocus==='left')?'left':'right';
   const active=focus==='left'?left:right;
   const other=focus==='left'?right:left;
 
-  // Topbar/bottom: no restar altura cuando el menú está oculto
-  if(topbar){
-    if(menuHidden){
-      topbar.style.setProperty('height','0','important');
-      topbar.style.setProperty('min-height','0','important');
-      topbar.style.setProperty('padding','0','important');
-      topbar.style.setProperty('overflow','visible','important');
-      topbar.style.setProperty('position','absolute','important');
-      topbar.style.setProperty('top','8px','important');
-      topbar.style.setProperty('left','8px','important');
-      topbar.style.setProperty('z-index','30','important');
-      topbar.style.setProperty('width','auto','important');
-      topbar.style.setProperty('background','transparent','important');
-      topbar.style.setProperty('border','0','important');
-    }else{
-      topbar.style.cssText='';
-    }
-  }
-  if(bottom){
-    if(menuHidden){
-      bottom.style.setProperty('display','none','important');
-      bottom.style.setProperty('height','0','important');
-    }else{
-      bottom.style.cssText='';
-    }
-  }
+  // Página activa: grande y centrada visualmente
+  active.style.setProperty('flex','3 1 0%','important');
+  active.style.setProperty('width','78%','important');
+  active.style.setProperty('max-width','78%','important');
+  active.style.setProperty('min-width','0','important');
+  active.style.setProperty('opacity','1','important');
+  active.style.setProperty('filter','none','important');
+  active.style.setProperty('z-index','3','important');
+  active.style.setProperty('transition','flex .3s ease,width .3s ease,max-width .3s ease,opacity .25s ease,filter .25s ease','important');
 
-  const stageH=menuHidden ? '100vh' : 'calc(100vh - 142px)';
-  stage.style.setProperty('min-height', stageH, 'important');
-  stage.style.setProperty('height', stageH, 'important');
-  stage.style.setProperty('max-height', stageH, 'important');
-  stage.style.setProperty('padding', menuHidden ? '0' : '', 'important');
-  stage.style.setProperty('overflow', 'hidden', 'important');
-  stage.style.setProperty('box-sizing', 'border-box', 'important');
+  // Página inactiva: franja lateral
+  other.style.setProperty('flex','1 1 0%','important');
+  other.style.setProperty('width','22%','important');
+  other.style.setProperty('max-width','22%','important');
+  other.style.setProperty('min-width','0','important');
+  other.style.setProperty('opacity','0.32','important');
+  other.style.setProperty('filter','brightness(0.45)','important');
+  other.style.setProperty('z-index','1','important');
+  other.style.setProperty('transition','flex .3s ease,width .3s ease,max-width .3s ease,opacity .25s ease,filter .25s ease','important');
 
+  // Asegurar contenedor flex
   spread.style.setProperty('display','flex','important');
   spread.style.setProperty('flex-direction','row','important');
   spread.style.setProperty('align-items','stretch','important');
-  spread.style.setProperty('justify-content','center','important');
   spread.style.setProperty('width','100%','important');
   spread.style.setProperty('max-width','100%','important');
-  spread.style.setProperty('height','100%','important');
-  spread.style.setProperty('max-height','100%','important');
   spread.style.setProperty('transform','none','important');
-  spread.style.setProperty('overflow','hidden','important');
-  spread.style.setProperty('box-sizing','border-box','important');
-  spread.style.setProperty('margin','0','important');
-
-  const applySheet=(el, isActive)=>{
-    el.style.setProperty('display','flex','important');
-    el.style.setProperty('align-items','center','important');
-    el.style.setProperty('justify-content','center','important');
-    el.style.setProperty('min-width','0','important');
-    el.style.setProperty('height','100%','important');
-    el.style.setProperty('max-height','100%','important');
-    el.style.setProperty('overflow','hidden','important');
-    el.style.setProperty('box-sizing','border-box','important');
-    el.style.setProperty('transition','flex .28s ease,width .28s ease,max-width .28s ease,opacity .22s ease,filter .22s ease','important');
-    if(isActive){
-      el.style.setProperty('flex', activePct+' 1 0%','important');
-      el.style.setProperty('width', activePct+'%','important');
-      el.style.setProperty('max-width', activePct+'%','important');
-      el.style.setProperty('opacity','1','important');
-      el.style.setProperty('filter','none','important');
-      el.style.setProperty('z-index','3','important');
-    }else{
-      el.style.setProperty('flex', otherPct+' 1 0%','important');
-      el.style.setProperty('width', otherPct+'%','important');
-      el.style.setProperty('max-width', otherPct+'%','important');
-      el.style.setProperty('opacity', menuHidden ? '0.28' : '0.38','important');
-      el.style.setProperty('filter', menuHidden ? 'brightness(0.4)' : 'brightness(0.55)','important');
-      el.style.setProperty('z-index','1','important');
-    }
-    const img=el.querySelector('img');
-    if(img){
-      img.style.setProperty('max-width','100%','important');
-      img.style.setProperty('max-height','100%','important');
-      img.style.setProperty('width','auto','important');
-      img.style.setProperty('height','auto','important');
-      img.style.setProperty('object-fit','contain','important');
-      // Ligero zoom extra en la imagen activa con menú oculto (sin salirse: max 100%)
-      if(isActive && menuHidden){
-        img.style.setProperty('transform','scale(1)','important');
-      }else{
-        img.style.setProperty('transform','none','important');
-      }
-    }
-  };
-  applySheet(active, true);
-  applySheet(other, false);
 }
-
 
 function renderBook(){
   const s=bookState;if(!s) return;
@@ -1438,15 +1364,7 @@ async function openBookUI(mid,tid,book,start,opts={}){
   }catch(e){}
 }
 
-function toggleBookControls(){
-  if(!bookState)return;
-  bookState.controlsHidden=!bookState.controlsHidden;
-  renderBook();
-  // Segundo tick por si el layout aún no midió alturas
-  requestAnimationFrame(()=>{ applyBookPageFocus(); });
-  setTimeout(()=>applyBookPageFocus(), 50);
-}
-
+function toggleBookControls(){if(!bookState)return;bookState.controlsHidden=!bookState.controlsHidden;renderBook();}
 async function toggleBookFullscreen(){const p=document.querySelector('.book-reader-page');if(!p)return;try{if(!document.fullscreenElement){if(p.requestFullscreen)await p.requestFullscreen();else if(p.webkitRequestFullscreen)p.webkitRequestFullscreen();}else if(document.exitFullscreen)await document.exitFullscreen();}catch(e){console.error(e)}}
 
 document.addEventListener('keydown',e=>{
