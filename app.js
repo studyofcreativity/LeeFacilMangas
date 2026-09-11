@@ -429,9 +429,9 @@ function renderBookPage(item,state,side){
   }
   if(item.type==='cover'){
     if(!item.src) return '<div class="book-sheet book-cover-sheet" aria-label="Portada sin imagen"></div>';
-    return `<div class="book-sheet book-cover-sheet"><img decoding="async" loading="eager" fetchpriority="high" src="${escapeHtml(item.src)}" alt="Portada del tomo"></div>`;
+    return `<div class="book-sheet book-cover-sheet" data-side="${side||''}"><img decoding="async" loading="eager" fetchpriority="high" src="${escapeHtml(item.src)}" alt="Portada del tomo"></div>`;
   }
-  return `<div class="book-sheet book-page-sheet"><img decoding="async" loading="eager" fetchpriority="high" src="${escapeHtml(item.src)}" alt="Página ${escapeHtml(String(item.page))}" data-book-page-id="${escapeHtml(item.id||'')}"></div>`;
+  return `<div class="book-sheet book-page-sheet" data-side="${side||''}" data-page="${escapeHtml(String(item.page))}"><img decoding="async" loading="eager" fetchpriority="high" src="${escapeHtml(item.src)}" alt="Página ${escapeHtml(String(item.page))}" data-book-page-id="${escapeHtml(item.id||'')}"></div>`;
 }
 
 function bookSpreadForState(state){
@@ -439,39 +439,41 @@ function bookSpreadForState(state){
   if(!item) return {desktop:false,left:null,right:null,single:true};
   if(item.type==='cover') return {desktop:false,left:null,right:item,single:true};
 
-  const wide=window.innerWidth>=900;
+  // Doble página desde 700px (antes 900 dejaba muchas pantallas en modo 1 página)
+  const wide=window.innerWidth>=700;
   if(!wide) return {desktop:false,left:null,right:item,single:true};
 
-  // Emparejar por posición dentro del capítulo (0-1, 2-3, ...),
-  // no solo por el número de página: así 1+2 siempre salen juntas.
+  // Inicio del bloque de páginas de este capítulo en la lista plana
   let chapterStart=state.index;
   while(chapterStart>0){
-    const prev=getBookItem(state,chapterStart-1);
-    if(!prev||prev.type!=='page'||prev.chapterId!==item.chapterId) break;
+    const p=getBookItem(state,chapterStart-1);
+    if(!p||p.type!=='page'||p.chapterId!==item.chapterId) break;
     chapterStart--;
   }
-  const local=state.index-chapterStart; // 0,1,2,... dentro del capítulo
-  let rightIndex, leftIndex;
-  if(local%2===0){
-    // Página "derecha" del spread (1ª, 3ª, 5ª del capítulo)
-    rightIndex=state.index;
-    leftIndex=state.index+1;
-  }else{
-    // Página "izquierda" del spread (2ª, 4ª, ...)
-    leftIndex=state.index;
-    rightIndex=state.index-1;
+  // Fin del capítulo
+  let chapterEnd=state.index;
+  while(true){
+    const n=getBookItem(state,chapterEnd+1);
+    if(!n||n.type!=='page'||n.chapterId!==item.chapterId) break;
+    chapterEnd++;
   }
 
+  const local=state.index-chapterStart; // 0-based
+  // Par: (0,1), (2,3), ... → derecha=par local, izquierda=impar local
+  const rightLocal=local%2===0 ? local : local-1;
+  const leftLocal=rightLocal+1;
+  const rightIndex=chapterStart+rightLocal;
+  const leftIndex=chapterStart+leftLocal;
+
   const right=getBookItem(state,rightIndex);
-  const left=getBookItem(state,leftIndex);
+  const left=leftLocal+chapterStart<=chapterEnd ? getBookItem(state,leftIndex) : null;
+
   const rightOk=!!(right&&right.type==='page'&&right.chapterId===item.chapterId);
   const leftOk=!!(left&&left.type==='page'&&left.chapterId===item.chapterId);
 
   if(rightOk&&leftOk){
     return {desktop:true,left,right,single:false,rightIndex,leftIndex};
   }
-
-  // Sin pareja: una sola página centrada
   const only=rightOk?right:item;
   return {desktop:false,left:null,right:only,single:true,rightIndex:rightOk?rightIndex:state.index,leftIndex:null};
 }
@@ -482,7 +484,7 @@ function renderBook(){
   // En escritorio, el cursor del spread debe quedar en la página DERECHA del par
   // (índice local par dentro del capítulo: 0,2,4...), para mostrar siempre 1+2, 3+4, etc.
   const current=getBookItem(s,s.index);
-  if(window.innerWidth>=900 && current?.type==='page'){
+  if(window.innerWidth>=700 && current?.type==='page'){
     let chapterStart=s.index;
     while(chapterStart>0){
       const prev=getBookItem(s,chapterStart-1);
@@ -520,7 +522,7 @@ function renderBook(){
     <div class="book-stage ${spread.desktop?'book-two-pages':''}${spread.single?' book-stage-single':''}">
       <button class="book-arrow book-arrow-left ${nextVisible?'':'disabled'}" onclick="bookNext()" ${nextVisible?'':'disabled'} aria-label="Página siguiente">‹</button>
       <div class="book-spread ${spread.desktop?'book-spread-pair':''} ${nextClass}">
-        ${spread.desktop&&spread.left?renderBookPage(spread.left,s,'left'):''}
+        ${spread.desktop && spread.left ? renderBookPage(spread.left,s,'left') : ''}
         ${renderBookPage(spread.right,s,'right')}
       </div>
       <button class="book-arrow book-arrow-right ${prevVisible?'':'disabled'}" onclick="bookPrev()" ${prevVisible?'':'disabled'} aria-label="Página anterior">›</button>
@@ -534,10 +536,15 @@ function renderBook(){
   const direction=s.animDirection;
   s.animDirection='';
   preloadBookNeighbors();
-  if(direction){
+  // Importante: al terminar el flip, quitar la clase o las páginas quedan en opacity:0
+  const spreadEl=reader.querySelector('.book-spread');
+  if(direction && spreadEl){
     window.setTimeout(()=>{
+      if(spreadEl.isConnected){
+        spreadEl.classList.remove('book-flip-next','book-flip-prev');
+      }
       if(bookState===s) preloadBookNeighbors();
-    },50);
+    }, 560);
   }
 }
 
@@ -581,7 +588,7 @@ async function bookNext(){
   const item=getBookItem(s,s.index);
   if(!item)return;
 
-  if(window.innerWidth>=900){
+  if(window.innerWidth>=700){
     // Avanzar un spread completo (2 páginas del mismo capítulo si existen)
     const nxt=getBookItem(s,s.index+1);
     const nxt2=getBookItem(s,s.index+2);
@@ -641,7 +648,7 @@ async function bookPrev(){
   const item=getBookItem(s,s.index);
   if(!item)return;
 
-  if(window.innerWidth>=900){
+  if(window.innerWidth>=700){
     // Retroceder un spread: a la pareja anterior del mismo capítulo, o capítulo previo
     if(s.index<=1){
       // Portada o primera página
@@ -777,7 +784,7 @@ async function openBookUI(mid,tid,book,start,opts={}){
 
   // En escritorio, alinear al índice local par (página derecha del spread).
   const initial=getBookItem(bookState,bookState.index);
-  if(window.innerWidth>=900 && initial?.type==='page'){
+  if(window.innerWidth>=700 && initial?.type==='page'){
     let cs=bookState.index;
     while(cs>0){
       const p=getBookItem(bookState,cs-1);
