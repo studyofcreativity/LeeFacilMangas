@@ -104,3 +104,63 @@ grant select, insert, update on public.chapter_reads to authenticated;
 -- TAMBIÉN EN EL DASHBOARD (manual):
 -- Authentication → Providers → Anonymous Sign-Ins → Enable
 -- ============================================================
+
+
+-- ============================================================
+-- Social a nivel MANGA (página de tomos)
+-- ============================================================
+create table if not exists public.manga_reactions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  manga_id uuid not null references public.mangas(id) on delete cascade,
+  reaction text not null check (reaction in ('like', 'dislike')),
+  created_at timestamptz not null default now(),
+  unique (user_id, manga_id)
+);
+
+create table if not exists public.manga_comments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  manga_id uuid not null references public.mangas(id) on delete cascade,
+  body text not null check (char_length(body) >= 1 and char_length(body) <= 2000),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists manga_reactions_manga_idx on public.manga_reactions(manga_id);
+create index if not exists manga_comments_manga_idx on public.manga_comments(manga_id, created_at desc);
+
+alter table public.manga_reactions enable row level security;
+alter table public.manga_comments enable row level security;
+
+drop policy if exists "manga_reactions_select_all" on public.manga_reactions;
+create policy "manga_reactions_select_all" on public.manga_reactions
+  for select to anon, authenticated using (true);
+
+drop policy if exists "manga_reactions_insert_own" on public.manga_reactions;
+create policy "manga_reactions_insert_own" on public.manga_reactions
+  for insert to authenticated with check (auth.uid() = user_id);
+
+drop policy if exists "manga_reactions_update_own" on public.manga_reactions;
+create policy "manga_reactions_update_own" on public.manga_reactions
+  for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "manga_reactions_delete_own" on public.manga_reactions;
+create policy "manga_reactions_delete_own" on public.manga_reactions
+  for delete to authenticated using (auth.uid() = user_id);
+
+drop policy if exists "manga_comments_select_all" on public.manga_comments;
+create policy "manga_comments_select_all" on public.manga_comments
+  for select to anon, authenticated using (true);
+
+drop policy if exists "manga_comments_insert_own" on public.manga_comments;
+create policy "manga_comments_insert_own" on public.manga_comments
+  for insert to authenticated with check (auth.uid() = user_id);
+
+drop policy if exists "manga_comments_delete_own" on public.manga_comments;
+create policy "manga_comments_delete_own" on public.manga_comments
+  for delete to authenticated using (auth.uid() = user_id);
+
+grant select, insert, update, delete on public.manga_reactions to authenticated;
+grant select on public.manga_reactions to anon;
+grant select, insert, delete on public.manga_comments to authenticated;
+grant select on public.manga_comments to anon;

@@ -29,3 +29,7 @@ QUE HACER EN SUPABASE (LeeMangasCross — social)
    - Abre la consola del navegador (F12)
    - Si dice que no hay sesión anónima: revisa el paso 1
    - Si error de RLS / permission: vuelve a ejecutar el SQL del paso 2
+
+6) Social del MANGA (página de tomos)
+   - Ejecuta de nuevo SUPABASE_SOCIAL.sql si aún no tiene las tablas manga_reactions y manga_comments
+   - En la ficha del manga (donde salen los tomos) verás 👍 / 👎 junto al título y comentarios debajo

@@ -194,6 +194,121 @@ async function mountSocial(chapterId){
   await refreshComments(chapterId);
 }
 
+/* ===== Social a nivel MANGA (página de tomos) ===== */
+async function loadMangaReactionState(mangaId){
+  const empty={likes:0,dislikes:0,mine:null};
+  if(!mangaId)return empty;
+  const {data,error}=await supabaseClient.from('manga_reactions').select('user_id,reaction').eq('manga_id',mangaId);
+  if(error){console.warn(error);return empty;}
+  let likes=0,dislikes=0,mine=null;
+  for(const r of (data||[])){
+    if(r.reaction==='like')likes++;
+    else if(r.reaction==='dislike')dislikes++;
+    if(currentUserId&&r.user_id===currentUserId)mine=r.reaction;
+  }
+  return {likes,dislikes,mine};
+}
+
+async function setMangaReaction(mangaId,reaction){
+  if(!currentUserId){await initReaderAuth();}
+  if(!currentUserId){alert('No se pudo iniciar sesión anónima. Activa Anonymous Sign-Ins en Supabase.');return;}
+  const state=await loadMangaReactionState(mangaId);
+  if(state.mine===reaction){
+    await supabaseClient.from('manga_reactions').delete().eq('manga_id',mangaId).eq('user_id',currentUserId);
+  }else if(state.mine){
+    await supabaseClient.from('manga_reactions').update({reaction}).eq('manga_id',mangaId).eq('user_id',currentUserId);
+  }else{
+    await supabaseClient.from('manga_reactions').insert({user_id:currentUserId,manga_id:mangaId,reaction});
+  }
+  await refreshMangaSocialBar(mangaId);
+}
+
+async function loadMangaComments(mangaId){
+  if(!mangaId)return [];
+  const {data,error}=await supabaseClient.from('manga_comments').select('*').eq('manga_id',mangaId).order('created_at',{ascending:false});
+  if(error){console.warn(error);return [];}
+  return data||[];
+}
+
+async function postMangaComment(mangaId){
+  const input=document.getElementById('manga-comment-input');
+  const body=(input?.value||'').trim();
+  if(!body)return;
+  if(!currentUserId){await initReaderAuth();}
+  if(!currentUserId){alert('No se pudo iniciar sesión anónima.');return;}
+  if(body.length>2000){alert('Máximo 2000 caracteres.');return;}
+  const {error}=await supabaseClient.from('manga_comments').insert({
+    user_id:currentUserId,manga_id:mangaId,body
+  });
+  if(error){alert(error.message||'No se pudo publicar');return;}
+  if(input)input.value='';
+  await refreshMangaComments(mangaId);
+}
+
+async function deleteMangaComment(commentId,mangaId){
+  if(!currentUserId)return;
+  await supabaseClient.from('manga_comments').delete().eq('id',commentId).eq('user_id',currentUserId);
+  await refreshMangaComments(mangaId);
+}
+
+async function refreshMangaComments(mangaId){
+  const box=document.getElementById('manga-comments-list');
+  if(!box)return;
+  box.innerHTML='<div class="comments-loading">Cargando comentarios...</div>';
+  const list=await loadMangaComments(mangaId);
+  if(!list.length){
+    box.innerHTML='<div class="comments-empty">Sé el primero en comentar este manga.</div>';
+    return;
+  }
+  box.innerHTML=list.map(c=>{
+    const mine=currentUserId&&c.user_id===currentUserId;
+    const anon='Lector '+(c.user_id||'').slice(0,6);
+    return `<div class="comment-item">
+      <div class="comment-meta"><span>${escapeHtml(anon)}</span><span>${escapeHtml(formatCommentDate(c.created_at))}</span>
+      ${mine?`<button type="button" class="comment-del" onclick="deleteMangaComment('${c.id}','${mangaId}')">Eliminar</button>`:''}
+      </div>
+      <div class="comment-body">${escapeHtml(c.body)}</div>
+    </div>`;
+  }).join('');
+}
+
+async function refreshMangaSocialBar(mangaId){
+  const st=await loadMangaReactionState(mangaId);
+  const likeClass=`react-btn ${st.mine==='like'?'active like':''}`;
+  const dislikeClass=`react-btn ${st.mine==='dislike'?'active dislike':''}`;
+  const bar=document.getElementById('manga-social-bar');
+  if(bar){
+    bar.innerHTML=`
+      <button type="button" class="${likeClass}" onclick="setMangaReaction('${mangaId}','like')">👍 Me gusta <span>${st.likes}</span></button>
+      <button type="button" class="${dislikeClass}" onclick="setMangaReaction('${mangaId}','dislike')">👎 No me gusta <span>${st.dislikes}</span></button>`;
+  }
+}
+
+function mangaSocialHtml(mangaId){
+  return `
+<div class="manga-social" id="manga-social">
+  <div class="social-bar manga-social-bar" id="manga-social-bar">
+    <button type="button" class="react-btn" disabled>👍 …</button>
+    <button type="button" class="react-btn" disabled>👎 …</button>
+  </div>
+  <div class="comments-box manga-comments-box">
+    <h3 class="comments-title">💬 Comentarios del manga</h3>
+    <div id="manga-comments-list" class="comments-list"><div class="comments-loading">Cargando...</div></div>
+    <div class="comment-form">
+      <textarea id="manga-comment-input" maxlength="2000" rows="3" placeholder="Escribe un comentario sobre este manga..."></textarea>
+      <button type="button" class="comment-send" onclick="postMangaComment('${mangaId}')">Publicar comentario</button>
+    </div>
+  </div>
+</div>`;
+}
+
+async function mountMangaSocial(mangaId){
+  await refreshMangaSocialBar(mangaId);
+  await refreshMangaComments(mangaId);
+}
+
+
+
 
 
 function waitMs(ms){return new Promise(r=>setTimeout(r,ms));}
@@ -341,9 +456,54 @@ async function openManga(id){
  if(chapterViewMode==='capitulos'){
   const allChapters=[];
   for(const t of (ts||[])){const {data:cs}=await supabaseClient.from('capitulos').select('*').eq('tomo_id',t.id).order('numero');(cs||[]).forEach(c=>allChapters.push({...c,tomoNumero:t.numero,tomoId:t.id,tomoCover:t.portada_url}));}
-  app.innerHTML=`<button class="back" onclick="goHome()">← Inicio</button><div class="manga-detail-head"><div><h1>${escapeHtml(m.nombre)}</h1>${m.descripcion?'<p>'+escapeHtml(m.descripcion)+'</p>':''}${tagHtml}</div></div><div class="chapter-view-heading">Todos los capítulos</div><div class="chapters chapters-all">${allChapters.map(c=>`<div class="chapter chapter-all-item ${readChapterIds.has(c.id)?'chapter-read':''}" data-chapter-id="${c.id}" onclick="openChapter('${id}','${c.tomoId}','${c.id}',${c.tomoNumero},${c.numero})"><span class="chapter-label">Capítulo ${escapeHtml(String(c.numero))}</span><small>Tomo ${escapeHtml(String(c.tomoNumero))}</small>${chapterReadBadge(c.id)}</div>`).join('')||'<div class="empty">Sin capítulos todavía.</div>'}</div>`;return;
+  app.innerHTML=`<button class="back" onclick="goHome()">← Inicio</button>
+<div class="manga-detail-head">
+  <div class="manga-title-row">
+    <h1>${escapeHtml(m.nombre)}</h1>
+  </div>
+  <div class="social-bar manga-social-bar" id="manga-social-bar">
+    <button type="button" class="react-btn" disabled>👍 …</button>
+    <button type="button" class="react-btn" disabled>👎 …</button>
+  </div>
+  ${m.descripcion?'<p class="manga-desc">'+escapeHtml(m.descripcion)+'</p>':''}
+  ${tagHtml}
+</div>
+<div class="comments-box manga-comments-box">
+  <h3 class="comments-title">💬 Comentarios del manga</h3>
+  <div id="manga-comments-list" class="comments-list"><div class="comments-loading">Cargando...</div></div>
+  <div class="comment-form">
+    <textarea id="manga-comment-input" maxlength="2000" rows="3" placeholder="Escribe un comentario sobre este manga..."></textarea>
+    <button type="button" class="comment-send" onclick="postMangaComment('${id}')">Publicar comentario</button>
+  </div>
+</div>
+<div class="chapter-view-heading">Todos los capítulos</div>
+<div class="chapters chapters-all">${allChapters.map(c=>`<div class="chapter chapter-all-item ${readChapterIds.has(c.id)?'chapter-read':''}" data-chapter-id="${c.id}" onclick="openChapter('${id}','${c.tomoId}','${c.id}',${c.tomoNumero},${c.numero})"><span class="chapter-label">Capítulo ${escapeHtml(String(c.numero))}</span><small>Tomo ${escapeHtml(String(c.tomoNumero))}</small>${chapterReadBadge(c.id)}</div>`).join('')||'<div class="empty">Sin capítulos todavía.</div>'}</div>`;
+  mountMangaSocial(id);
+  return;
  }
- app.innerHTML=`<button class="back" onclick="goHome()">← Inicio</button><h1>${escapeHtml(m.nombre)}</h1>${m.descripcion?'<p>'+escapeHtml(m.descripcion)+'</p>':''}${tagHtml}<h2>Tomos</h2><div class="tomos">${(ts||[]).map(t=>`<div class="tomo" onclick="openTomo('${id}','${t.id}',${t.numero})">${t.portada_url?`<img class="tomo-cover" src="${escapeHtml(t.portada_url)}" alt="">`:''}<span>Tomo ${escapeHtml(String(t.numero))}</span></div>`).join('')||'<div class="empty">Sin tomos todavía.</div>'}</div>`;
+ app.innerHTML=`<button class="back" onclick="goHome()">← Inicio</button>
+<div class="manga-detail-head">
+  <div class="manga-title-row">
+    <h1>${escapeHtml(m.nombre)}</h1>
+  </div>
+  <div class="social-bar manga-social-bar" id="manga-social-bar">
+    <button type="button" class="react-btn" disabled>👍 …</button>
+    <button type="button" class="react-btn" disabled>👎 …</button>
+  </div>
+  ${m.descripcion?'<p class="manga-desc">'+escapeHtml(m.descripcion)+'</p>':''}
+  ${tagHtml}
+</div>
+<div class="comments-box manga-comments-box">
+  <h3 class="comments-title">💬 Comentarios del manga</h3>
+  <div id="manga-comments-list" class="comments-list"><div class="comments-loading">Cargando...</div></div>
+  <div class="comment-form">
+    <textarea id="manga-comment-input" maxlength="2000" rows="3" placeholder="Escribe un comentario sobre este manga..."></textarea>
+    <button type="button" class="comment-send" onclick="postMangaComment('${id}')">Publicar comentario</button>
+  </div>
+</div>
+<h2>Tomos</h2>
+<div class="tomos">${(ts||[]).map(t=>`<div class="tomo" onclick="openTomo('${id}','${t.id}',${t.numero})">${t.portada_url?`<img class="tomo-cover" src="${escapeHtml(t.portada_url)}" alt="">`:''}<span>Tomo ${escapeHtml(String(t.numero))}</span></div>`).join('')||'<div class="empty">Sin tomos todavía.</div>'}</div>`;
+  mountMangaSocial(id);
 }
 
 async function openTomo(mid,tid,num){
