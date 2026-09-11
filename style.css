@@ -1100,3 +1100,161 @@ body.reader-mode.reader-controls-hidden .social-bar-inline{
   border:1px solid #2c2c34;
   border-radius:12px;
 }
+
+
+/* === Social del manga: bloque inferior ordenado === */
+.manga-detail-head{
+  max-width:1100px;
+  margin:0 auto 8px;
+  padding:8px 16px 0;
+}
+.manga-detail-title{
+  margin:0 0 8px;
+  font-size:clamp(1.5rem, 3vw, 2.1rem);
+  line-height:1.2;
+}
+.manga-desc{
+  color:#bdbdbd;
+  line-height:1.5;
+  margin:0 0 12px;
+  max-width:720px;
+}
+.manga-section-title{
+  max-width:1100px;
+  margin:18px auto 12px;
+  padding:0 16px;
+  font-size:1.15rem;
+}
+.manga-social-footer{
+  max-width:720px;
+  margin:48px auto 64px;
+  padding:0 16px 24px;
+}
+.manga-social-card{
+  background:linear-gradient(180deg, #1a1a22 0%, #121218 100%);
+  border:1px solid #2e2e38;
+  border-radius:16px;
+  padding:22px 20px 20px;
+  box-shadow:0 12px 40px rgba(0,0,0,.28);
+}
+.manga-social-card-head{
+  text-align:center;
+  margin-bottom:16px;
+}
+.manga-social-heading{
+  margin:0 0 6px;
+  font-size:1.15rem;
+  color:#f2f2f2;
+  font-weight:700;
+}
+.manga-social-sub{
+  margin:0;
+  font-size:13px;
+  color:#8a8a96;
+}
+.manga-social-footer .manga-social-bar{
+  display:flex !important;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:12px;
+  margin:0 0 18px;
+}
+.manga-social-footer .react-btn{
+  min-width:140px;
+  background:#25252e;
+  color:#eee;
+  border:1px solid #3d3d4a;
+  border-radius:12px;
+  padding:12px 18px;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+  transition:border-color .15s, background .15s, transform .12s;
+}
+.manga-social-footer .react-btn:hover{
+  border-color:#e53945;
+  transform:translateY(-1px);
+}
+.manga-social-footer .react-btn.active.like{
+  background:#1b5e20;
+  border-color:#43a047;
+  color:#e8f5e9;
+}
+.manga-social-footer .react-btn.active.dislike{
+  background:#5d1a1a;
+  border-color:#e53945;
+  color:#ffebee;
+}
+.manga-social-divider{
+  height:1px;
+  background:#2a2a34;
+  margin:4px 0 16px;
+}
+.manga-social-footer .manga-comments-box{
+  background:transparent;
+  border:0;
+  padding:0;
+  margin:0;
+  max-width:none;
+}
+.manga-social-footer .comments-title{
+  margin:0 0 12px;
+  font-size:1rem;
+  text-align:left;
+}
+.manga-social-footer .comments-list{
+  max-height:320px;
+  overflow:auto;
+  margin-bottom:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.manga-social-footer .comment-item{
+  background:#0e0e14;
+  border:1px solid #2a2a34;
+  border-radius:10px;
+  padding:10px 12px;
+}
+.manga-social-footer .comment-form{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.manga-social-footer .comment-form textarea{
+  width:100%;
+  box-sizing:border-box;
+  min-height:88px;
+  background:#0c0c12;
+  color:#eee;
+  border:1px solid #3a3a45;
+  border-radius:10px;
+  padding:12px;
+  font-size:14px;
+  font-family:inherit;
+  resize:vertical;
+}
+.manga-social-footer .comment-send{
+  align-self:flex-end;
+  background:#e53945;
+  color:#fff;
+  border:0;
+  border-radius:10px;
+  padding:11px 18px;
+  font-weight:700;
+  cursor:pointer;
+  font-size:14px;
+}
+.manga-social-footer .comment-send:hover{filter:brightness(1.08)}
+.manga-social-footer .comments-empty,
+.manga-social-footer .comments-loading{
+  color:#888;
+  font-size:13px;
+  padding:8px 0;
+  text-align:center;
+}
+
+@media (max-width:600px){
+  .manga-social-footer .react-btn{min-width:120px;flex:1}
+  .manga-social-footer .comment-send{width:100%;align-self:stretch}
+}

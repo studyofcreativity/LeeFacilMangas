@@ -286,20 +286,27 @@ async function refreshMangaSocialBar(mangaId){
 
 function mangaSocialHtml(mangaId){
   return `
-<div class="manga-social" id="manga-social">
-  <div class="social-bar manga-social-bar" id="manga-social-bar">
-    <button type="button" class="react-btn" disabled>👍 …</button>
-    <button type="button" class="react-btn" disabled>👎 …</button>
-  </div>
-  <div class="comments-box manga-comments-box">
-    <h3 class="comments-title">💬 Comentarios del manga</h3>
-    <div id="manga-comments-list" class="comments-list"><div class="comments-loading">Cargando...</div></div>
-    <div class="comment-form">
-      <textarea id="manga-comment-input" maxlength="2000" rows="3" placeholder="Escribe un comentario sobre este manga..."></textarea>
-      <button type="button" class="comment-send" onclick="postMangaComment('${mangaId}')">Publicar comentario</button>
+<section class="manga-social-footer" id="manga-social">
+  <div class="manga-social-card">
+    <div class="manga-social-card-head">
+      <h3 class="manga-social-heading">¿Qué te pareció este manga?</h3>
+      <p class="manga-social-sub">Tu opinión ayuda a otros lectores</p>
+    </div>
+    <div class="social-bar manga-social-bar" id="manga-social-bar">
+      <button type="button" class="react-btn react-like" disabled>👍 Me gusta <span>…</span></button>
+      <button type="button" class="react-btn react-dislike" disabled>👎 No me gusta <span>…</span></button>
+    </div>
+    <div class="manga-social-divider"></div>
+    <div class="comments-box manga-comments-box">
+      <h3 class="comments-title">💬 Comentarios</h3>
+      <div id="manga-comments-list" class="comments-list"><div class="comments-loading">Cargando...</div></div>
+      <div class="comment-form">
+        <textarea id="manga-comment-input" maxlength="2000" rows="3" placeholder="Escribe un comentario..."></textarea>
+        <button type="button" class="comment-send" onclick="postMangaComment('${mangaId}')">Publicar</button>
+      </div>
     </div>
   </div>
-</div>`;
+</section>`;
 }
 
 async function mountMangaSocial(mangaId){
@@ -453,56 +460,32 @@ async function openManga(id){
  m.tags=getMangaTags(m);
  const {data:ts}=await supabaseClient.from('tomos').select('*').eq('manga_id',id).order('numero');
  const tagHtml=renderTags(m);
+
+ const headHtml=`<button class="back" onclick="goHome()">← Inicio</button>
+<div class="manga-detail-head">
+  <h1 class="manga-detail-title">${escapeHtml(m.nombre)}</h1>
+  ${m.descripcion?`<p class="manga-desc">${escapeHtml(m.descripcion)}</p>`:''}
+  ${tagHtml}
+</div>`;
+
  if(chapterViewMode==='capitulos'){
   const allChapters=[];
-  for(const t of (ts||[])){const {data:cs}=await supabaseClient.from('capitulos').select('*').eq('tomo_id',t.id).order('numero');(cs||[]).forEach(c=>allChapters.push({...c,tomoNumero:t.numero,tomoId:t.id,tomoCover:t.portada_url}));}
-  app.innerHTML=`<button class="back" onclick="goHome()">← Inicio</button>
-<div class="manga-detail-head">
-  <div class="manga-title-row">
-    <h1>${escapeHtml(m.nombre)}</h1>
-  </div>
-  <div class="social-bar manga-social-bar" id="manga-social-bar">
-    <button type="button" class="react-btn" disabled>👍 …</button>
-    <button type="button" class="react-btn" disabled>👎 …</button>
-  </div>
-  ${m.descripcion?'<p class="manga-desc">'+escapeHtml(m.descripcion)+'</p>':''}
-  ${tagHtml}
-</div>
-<div class="comments-box manga-comments-box">
-  <h3 class="comments-title">💬 Comentarios del manga</h3>
-  <div id="manga-comments-list" class="comments-list"><div class="comments-loading">Cargando...</div></div>
-  <div class="comment-form">
-    <textarea id="manga-comment-input" maxlength="2000" rows="3" placeholder="Escribe un comentario sobre este manga..."></textarea>
-    <button type="button" class="comment-send" onclick="postMangaComment('${id}')">Publicar comentario</button>
-  </div>
-</div>
+  for(const t of (ts||[])){
+    const {data:cs}=await supabaseClient.from('capitulos').select('*').eq('tomo_id',t.id).order('numero');
+    (cs||[]).forEach(c=>allChapters.push({...c,tomoNumero:t.numero,tomoId:t.id,tomoCover:t.portada_url}));
+  }
+  app.innerHTML=`${headHtml}
 <div class="chapter-view-heading">Todos los capítulos</div>
-<div class="chapters chapters-all">${allChapters.map(c=>`<div class="chapter chapter-all-item ${readChapterIds.has(c.id)?'chapter-read':''}" data-chapter-id="${c.id}" onclick="openChapter('${id}','${c.tomoId}','${c.id}',${c.tomoNumero},${c.numero})"><span class="chapter-label">Capítulo ${escapeHtml(String(c.numero))}</span><small>Tomo ${escapeHtml(String(c.tomoNumero))}</small>${chapterReadBadge(c.id)}</div>`).join('')||'<div class="empty">Sin capítulos todavía.</div>'}</div>`;
+<div class="chapters chapters-all">${allChapters.map(c=>`<div class="chapter chapter-all-item ${readChapterIds.has(c.id)?'chapter-read':''}" data-chapter-id="${c.id}" onclick="openChapter('${id}','${c.tomoId}','${c.id}',${c.tomoNumero},${c.numero})"><span class="chapter-label">Capítulo ${escapeHtml(String(c.numero))}</span><small>Tomo ${escapeHtml(String(c.tomoNumero))}</small>${chapterReadBadge(c.id)}</div>`).join('')||'<div class="empty">Sin capítulos todavía.</div>'}</div>
+${mangaSocialHtml(id)}`;
   mountMangaSocial(id);
   return;
  }
- app.innerHTML=`<button class="back" onclick="goHome()">← Inicio</button>
-<div class="manga-detail-head">
-  <div class="manga-title-row">
-    <h1>${escapeHtml(m.nombre)}</h1>
-  </div>
-  <div class="social-bar manga-social-bar" id="manga-social-bar">
-    <button type="button" class="react-btn" disabled>👍 …</button>
-    <button type="button" class="react-btn" disabled>👎 …</button>
-  </div>
-  ${m.descripcion?'<p class="manga-desc">'+escapeHtml(m.descripcion)+'</p>':''}
-  ${tagHtml}
-</div>
-<div class="comments-box manga-comments-box">
-  <h3 class="comments-title">💬 Comentarios del manga</h3>
-  <div id="manga-comments-list" class="comments-list"><div class="comments-loading">Cargando...</div></div>
-  <div class="comment-form">
-    <textarea id="manga-comment-input" maxlength="2000" rows="3" placeholder="Escribe un comentario sobre este manga..."></textarea>
-    <button type="button" class="comment-send" onclick="postMangaComment('${id}')">Publicar comentario</button>
-  </div>
-</div>
-<h2>Tomos</h2>
-<div class="tomos">${(ts||[]).map(t=>`<div class="tomo" onclick="openTomo('${id}','${t.id}',${t.numero})">${t.portada_url?`<img class="tomo-cover" src="${escapeHtml(t.portada_url)}" alt="">`:''}<span>Tomo ${escapeHtml(String(t.numero))}</span></div>`).join('')||'<div class="empty">Sin tomos todavía.</div>'}</div>`;
+
+ app.innerHTML=`${headHtml}
+<h2 class="manga-section-title">Tomos</h2>
+<div class="tomos">${(ts||[]).map(t=>`<div class="tomo" onclick="openTomo('${id}','${t.id}',${t.numero})">${t.portada_url?`<img class="tomo-cover" src="${escapeHtml(t.portada_url)}" alt="">`:''}<span>Tomo ${escapeHtml(String(t.numero))}</span></div>`).join('')||'<div class="empty">Sin tomos todavía.</div>'}</div>
+${mangaSocialHtml(id)}`;
   mountMangaSocial(id);
 }
 
