@@ -114,6 +114,39 @@ async function deleteComment(commentId,chapterId){
   await refreshComments(chapterId);
 }
 
+
+function formatRelativeTime(iso){
+  if(!iso)return '';
+  try{
+    const d=new Date(iso);
+    const diff=Math.max(0, Date.now()-d.getTime());
+    const sec=Math.floor(diff/1000);
+    if(sec<60)return 'hace un momento';
+    const min=Math.floor(sec/60);
+    if(min<60)return min===1?'hace 1 minuto':`hace ${min} minutos`;
+    const hr=Math.floor(min/60);
+    if(hr<24)return hr===1?'hace 1 hora':`hace ${hr} horas`;
+    const day=Math.floor(hr/24);
+    if(day<7)return day===1?'hace 1 día':`hace ${day} días`;
+    const week=Math.floor(day/7);
+    if(week<5)return week===1?'hace 1 semana':`hace ${week} semanas`;
+    return d.toLocaleDateString('es',{day:'numeric',month:'short',year:'numeric'});
+  }catch(_){return '';}
+}
+
+function anonDisplayName(userId){
+  const id=(userId||'anonimo').replace(/-/g,'').slice(0,8);
+  // nombre estable a partir del id
+  const names=['Lector','Fansub','Otaku','Mangaka','Shadow','Nova','Ryu','Kira','Yuki','Akira','Sora','Neko'];
+  let n=0; for(let i=0;i<id.length;i++) n=(n+id.charCodeAt(i)* (i+1))%names.length;
+  return names[n]+' '+id.slice(0,4).toUpperCase();
+}
+
+function anonAvatarLetter(userId){
+  const name=anonDisplayName(userId);
+  return (name.charAt(0)||'L').toUpperCase();
+}
+
 function formatCommentDate(iso){
   try{
     const d=new Date(iso);
@@ -257,18 +290,30 @@ async function refreshMangaComments(mangaId){
   box.innerHTML='<div class="comments-loading">Cargando comentarios...</div>';
   const list=await loadMangaComments(mangaId);
   if(!list.length){
-    box.innerHTML='<div class="comments-empty">Sé el primero en comentar este manga.</div>';
+    box.innerHTML='<div class="comments-empty">Sé el primero en comentar.</div>';
     return;
   }
   box.innerHTML=list.map(c=>{
     const mine=currentUserId&&c.user_id===currentUserId;
-    const anon='Lector '+(c.user_id||'').slice(0,6);
-    return `<div class="comment-item">
-      <div class="comment-meta"><span>${escapeHtml(anon)}</span><span>${escapeHtml(formatCommentDate(c.created_at))}</span>
-      ${mine?`<button type="button" class="comment-del" onclick="deleteMangaComment('${c.id}','${mangaId}')">Eliminar</button>`:''}
+    const name=anonDisplayName(c.user_id);
+    const letter=anonAvatarLetter(c.user_id);
+    const when=formatRelativeTime(c.created_at);
+    return `<article class="fb-comment">
+      <div class="fb-avatar" aria-hidden="true">${escapeHtml(letter)}</div>
+      <div class="fb-comment-main">
+        <div class="fb-bubble">
+          <div class="fb-name-row">
+            <span class="fb-name">${escapeHtml(name)}</span>
+            <span class="fb-time">${escapeHtml(when)}</span>
+            ${mine?`<button type="button" class="comment-del" title="Eliminar" onclick="deleteMangaComment('${c.id}','${mangaId}')">✕</button>`:''}
+          </div>
+          <div class="fb-text">${escapeHtml(c.body)}</div>
+        </div>
+        <div class="fb-actions">
+          <button type="button" class="fb-like-action" onclick="setMangaReaction('${mangaId}','like')">Me gusta</button>
+        </div>
       </div>
-      <div class="comment-body">${escapeHtml(c.body)}</div>
-    </div>`;
+    </article>`;
   }).join('');
 }
 
@@ -289,20 +334,22 @@ function mangaSocialHtml(mangaId){
 <section class="manga-social-footer" id="manga-social">
   <div class="manga-social-card">
     <div class="manga-social-card-head">
-      <h3 class="manga-social-heading">¿Qué te pareció este manga?</h3>
-      <p class="manga-social-sub">Tu opinión ayuda a otros lectores</p>
+      <div class="social-bar manga-social-bar" id="manga-social-bar">
+        <button type="button" class="react-btn react-like" disabled>👍 Me gusta <span>…</span></button>
+        <button type="button" class="react-btn react-dislike" disabled>👎 No me gusta <span>…</span></button>
+      </div>
     </div>
-    <div class="social-bar manga-social-bar" id="manga-social-bar">
-      <button type="button" class="react-btn react-like" disabled>👍 Me gusta <span>…</span></button>
-      <button type="button" class="react-btn react-dislike" disabled>👎 No me gusta <span>…</span></button>
-    </div>
-    <div class="manga-social-divider"></div>
-    <div class="comments-box manga-comments-box">
-      <h3 class="comments-title">💬 Comentarios</h3>
-      <div id="manga-comments-list" class="comments-list"><div class="comments-loading">Cargando...</div></div>
-      <div class="comment-form">
-        <textarea id="manga-comment-input" maxlength="2000" rows="3" placeholder="Escribe un comentario..."></textarea>
-        <button type="button" class="comment-send" onclick="postMangaComment('${mangaId}')">Publicar</button>
+    <div class="fb-comments-wrap">
+      <h3 class="comments-title">Comentarios</h3>
+      <div id="manga-comments-list" class="fb-comments-list comments-list">
+        <div class="comments-loading">Cargando...</div>
+      </div>
+      <div class="fb-composer comment-form">
+        <div class="fb-avatar fb-avatar-me" aria-hidden="true">Tú</div>
+        <div class="fb-composer-body">
+          <textarea id="manga-comment-input" maxlength="2000" rows="2" placeholder="Escribe un comentario..."></textarea>
+          <button type="button" class="comment-send" onclick="postMangaComment('${mangaId}')">Publicar</button>
+        </div>
       </div>
     </div>
   </div>

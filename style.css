@@ -1102,159 +1102,201 @@ body.reader-mode.reader-controls-hidden .social-bar-inline{
 }
 
 
-/* === Social del manga: bloque inferior ordenado === */
-.manga-detail-head{
-  max-width:1100px;
-  margin:0 auto 8px;
-  padding:8px 16px 0;
-}
-.manga-detail-title{
-  margin:0 0 8px;
-  font-size:clamp(1.5rem, 3vw, 2.1rem);
-  line-height:1.2;
-}
-.manga-desc{
-  color:#bdbdbd;
-  line-height:1.5;
-  margin:0 0 12px;
-  max-width:720px;
-}
-.manga-section-title{
-  max-width:1100px;
-  margin:18px auto 12px;
-  padding:0 16px;
-  font-size:1.15rem;
-}
+
+
+/* === Comentarios estilo feed (debajo de tomos / capítulos) === */
 .manga-social-footer{
-  max-width:720px;
-  margin:48px auto 64px;
-  padding:0 16px 24px;
-}
-.manga-social-card{
-  background:linear-gradient(180deg, #1a1a22 0%, #121218 100%);
-  border:1px solid #2e2e38;
-  border-radius:16px;
-  padding:22px 20px 20px;
-  box-shadow:0 12px 40px rgba(0,0,0,.28);
-}
-.manga-social-card-head{
-  text-align:center;
-  margin-bottom:16px;
-}
-.manga-social-heading{
-  margin:0 0 6px;
-  font-size:1.15rem;
-  color:#f2f2f2;
-  font-weight:700;
-}
-.manga-social-sub{
-  margin:0;
-  font-size:13px;
-  color:#8a8a96;
-}
-.manga-social-footer .manga-social-bar{
-  display:flex !important;
-  justify-content:center;
-  flex-wrap:wrap;
-  gap:12px;
-  margin:0 0 18px;
-}
-.manga-social-footer .react-btn{
-  min-width:140px;
-  background:#25252e;
-  color:#eee;
-  border:1px solid #3d3d4a;
-  border-radius:12px;
-  padding:12px 18px;
-  font-size:14px;
-  font-weight:700;
-  cursor:pointer;
-  transition:border-color .15s, background .15s, transform .12s;
-}
-.manga-social-footer .react-btn:hover{
-  border-color:#e53945;
-  transform:translateY(-1px);
-}
-.manga-social-footer .react-btn.active.like{
-  background:#1b5e20;
-  border-color:#43a047;
-  color:#e8f5e9;
-}
-.manga-social-footer .react-btn.active.dislike{
-  background:#5d1a1a;
-  border-color:#e53945;
-  color:#ffebee;
-}
-.manga-social-divider{
-  height:1px;
-  background:#2a2a34;
-  margin:4px 0 16px;
-}
-.manga-social-footer .manga-comments-box{
-  background:transparent;
-  border:0;
-  padding:0;
-  margin:0;
-  max-width:none;
-}
-.manga-social-footer .comments-title{
-  margin:0 0 12px;
-  font-size:1rem;
-  text-align:left;
-}
-.manga-social-footer .comments-list{
-  max-height:320px;
-  overflow:auto;
-  margin-bottom:12px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.manga-social-footer .comment-item{
-  background:#0e0e14;
-  border:1px solid #2a2a34;
-  border-radius:10px;
-  padding:10px 12px;
-}
-.manga-social-footer .comment-form{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.manga-social-footer .comment-form textarea{
+  max-width:680px;
+  margin:40px auto 72px;
+  padding:0 16px 32px;
   width:100%;
   box-sizing:border-box;
-  min-height:88px;
-  background:#0c0c12;
+}
+.manga-social-card{
+  background:#16161c;
+  border:1px solid #2a2a34;
+  border-radius:14px;
+  padding:16px 14px 14px;
+}
+.manga-social-card-head{
+  margin-bottom:14px;
+  padding-bottom:12px;
+  border-bottom:1px solid #2a2a34;
+}
+.manga-social-footer .manga-social-bar{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  justify-content:flex-start;
+  margin:0;
+}
+.manga-social-footer .react-btn{
+  background:#22222a;
+  color:#e8e8ec;
+  border:1px solid #3a3a46;
+  border-radius:20px;
+  padding:8px 16px;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+}
+.manga-social-footer .react-btn.active.like{
+  background:#1b4332;
+  border-color:#2d6a4f;
+  color:#d8f3dc;
+}
+.manga-social-footer .react-btn.active.dislike{
+  background:#4a1c1c;
+  border-color:#9b2226;
+  color:#ffccd5;
+}
+
+.fb-comments-wrap .comments-title{
+  margin:0 0 14px;
+  font-size:15px;
+  font-weight:700;
+  color:#f0f0f4;
+}
+
+.fb-comments-list{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  max-height:none;
+  overflow:visible;
+  margin-bottom:16px;
+}
+
+.fb-comment{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+}
+.fb-avatar{
+  flex:0 0 36px;
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#3a3a48,#2a2a36);
+  color:#ddd;
+  font-size:13px;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-transform:uppercase;
+}
+.fb-avatar-me{
+  background:linear-gradient(135deg,#e53945,#b71c1c);
+  color:#fff;
+  font-size:11px;
+}
+.fb-comment-main{flex:1;min-width:0}
+.fb-bubble{
+  background:#1e1e28;
+  border-radius:16px;
+  padding:8px 12px 10px;
+  display:inline-block;
+  max-width:100%;
+  box-sizing:border-box;
+}
+.fb-name-row{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px 10px;
+  margin-bottom:2px;
+}
+.fb-name{
+  font-size:13px;
+  font-weight:700;
+  color:#f2f2f6;
+}
+.fb-time{
+  font-size:12px;
+  color:#8b8b9a;
+}
+.fb-text{
+  font-size:14px;
+  line-height:1.45;
+  color:#d8d8e0;
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.fb-actions{
+  padding:2px 4px 0 8px;
+}
+.fb-like-action{
+  background:none;
+  border:0;
+  color:#8b8b9a;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+  padding:2px 0;
+}
+.fb-like-action:hover{color:#e53945}
+
+.fb-composer{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  padding-top:12px;
+  border-top:1px solid #2a2a34;
+}
+.fb-composer-body{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  min-width:0;
+}
+.fb-composer textarea{
+  width:100%;
+  box-sizing:border-box;
+  min-height:44px;
+  background:#1e1e28;
   color:#eee;
-  border:1px solid #3a3a45;
-  border-radius:10px;
-  padding:12px;
+  border:1px solid #333;
+  border-radius:20px;
+  padding:10px 14px;
   font-size:14px;
   font-family:inherit;
   resize:vertical;
 }
-.manga-social-footer .comment-send{
+.fb-composer textarea:focus{
+  outline:none;
+  border-color:#e53945;
+}
+.fb-composer .comment-send{
   align-self:flex-end;
   background:#e53945;
   color:#fff;
   border:0;
-  border-radius:10px;
-  padding:11px 18px;
+  border-radius:18px;
+  padding:8px 16px;
   font-weight:700;
+  font-size:13px;
   cursor:pointer;
-  font-size:14px;
 }
-.manga-social-footer .comment-send:hover{filter:brightness(1.08)}
-.manga-social-footer .comments-empty,
-.manga-social-footer .comments-loading{
+.comment-del{
+  margin-left:auto;
+  background:transparent;
+  border:0;
+  color:#777;
+  cursor:pointer;
+  font-size:12px;
+  padding:0 4px;
+}
+.comment-del:hover{color:#e53945}
+.comments-empty,.comments-loading{
   color:#888;
   font-size:13px;
-  padding:8px 0;
   text-align:center;
+  padding:12px 0;
 }
 
 @media (max-width:600px){
-  .manga-social-footer .react-btn{min-width:120px;flex:1}
-  .manga-social-footer .comment-send{width:100%;align-self:stretch}
+  .manga-social-footer{margin-top:28px}
+  .fb-avatar{width:32px;height:32px;flex-basis:32px;font-size:12px}
 }
