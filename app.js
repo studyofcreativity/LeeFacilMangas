@@ -742,6 +742,7 @@ async function switchTomoAnimated(mid,tid,direction){
     navTomos:tomos||[],
     chapterFlash:false,
     animDirection:'',
+    pageFocus:'right',
     touchX:null,
     imageCache:new Map()
   };
@@ -883,9 +884,15 @@ function renderBook(){
 
   const spread=bookSpreadForState(s);
   const currentRight=spread.right;
-  const chapterMeta=currentRight?.type==='page'
-    ? `Tomo ${s.book.tomo.numero} · Capítulo ${currentRight.chapter} · Página ${currentRight.page}${spread.left?`-${spread.left.page}`:''}`
-    : `Portada`;
+  // Asegurar pageFocus válido
+  if(!spread.desktop || spread.single || !spread.left) s.pageFocus='right';
+  if(s.pageFocus!=='left' && s.pageFocus!=='right') s.pageFocus='right';
+  const focusedItem=(spread.desktop && !spread.single && s.pageFocus==='left' && spread.left)
+    ? spread.left
+    : (currentRight||spread.right);
+  const chapterMeta=focusedItem?.type==='page'
+    ? `Tomo ${s.book.tomo.numero} · Capítulo ${focusedItem.chapter} · Página ${focusedItem.page}${spread.desktop&&spread.left?` (${spread.right.page}-${spread.left.page})`:''}`
+    : (currentRight?.type==='cover' || s.index===0 ? `Portada` : `Portada`);
   const tomoMeta=`Tomo ${s.book.tomo.numero}`;
   const chapterId=currentRight?.type==='page'?currentRight.chapterId:null;
 
@@ -902,13 +909,13 @@ function renderBook(){
       <div class="book-title">${escapeHtml(s.mangaName)}<small>${escapeHtml(chapterMeta)}</small></div>
       <button class="book-full" onclick="toggleBookFullscreen()">⛶</button>
     </div>
-    <div class="book-stage ${spread.desktop?'book-two-pages':''}${spread.single?' book-stage-single':''}">
-      <button class="book-arrow book-arrow-left ${nextVisible?'':'disabled'}" onclick="bookNext()" ${nextVisible?'':'disabled'} aria-label="Página siguiente">‹</button>
-      <div class="book-spread ${spread.desktop?'book-spread-pair':''} ${nextClass}">
+    <div class="book-stage ${spread.desktop?'book-two-pages':''}${spread.single?' book-stage-single':''} ${spread.desktop&&!spread.single?('book-focus-'+s.pageFocus):''}">
+      <button class="book-arrow book-arrow-left" onclick="bookArrowLeft()" aria-label="Avanzar">‹</button>
+      <div class="book-spread ${spread.desktop?'book-spread-pair':''} ${nextClass} ${spread.desktop&&!spread.single?('book-zoom-'+s.pageFocus):''}">
         ${spread.desktop && spread.left ? renderBookPage(spread.left,s,'left') : ''}
         ${renderBookPage(spread.right,s,'right')}
       </div>
-      <button class="book-arrow book-arrow-right ${prevVisible?'':'disabled'}" onclick="bookPrev()" ${prevVisible?'':'disabled'} aria-label="Página anterior">›</button>
+      <button class="book-arrow book-arrow-right" onclick="bookArrowRight()" aria-label="Retroceder">›</button>
     </div>
     <div class="book-bottom"><span>${escapeHtml(tomoMeta)}</span><span>${s.index===0?'Portada':escapeHtml(chapterMeta)}</span></div>
     ${s.chapterFlash?`<div class="book-chapter-flash">Capítulo ${escapeHtml(String(currentRight?.chapter??''))}</div>`:''}`;
@@ -939,6 +946,10 @@ function setBookIndex(index,direction){
   const prevItem=getBookItem(s,prevIndex);
   s.index=next;
   s.animDirection=direction;
+  // Al cambiar de spread: avanzar → derecha; retroceder → izquierda (si hay par)
+  if(direction==='next') s.pageFocus='right';
+  else if(direction==='prev') s.pageFocus=s.pageFocus||'left';
+
   const currCh=bookIndexToChapter(s.book,s.index)?.chapterId||null;
   const prevCh=bookIndexToChapter(s.book,prevIndex)?.chapterId||null;
   s.chapterFlash=!!(currCh&&prevCh&&currCh!==prevCh);
@@ -970,6 +981,76 @@ function setBookIndex(index,direction){
     window.setTimeout(()=>{if(bookState===s){s.chapterFlash=false;renderBook();}},700);
   }
   return true;
+}
+
+
+/**
+ * Flechas con doble función en modo libro (escritorio, doble página):
+ * - pageFocus 'right' = leyendo la página derecha del spread
+ * - pageFocus 'left'  = leyendo la página izquierda
+ *
+ * Flecha IZQUIERDA (avance manga RTL):
+ *   derecha → enfoca izquierda
+ *   izquierda → siguiente par de páginas (o fin / siguiente tomo)
+ *
+ * Flecha DERECHA (retroceso):
+ *   izquierda → enfoca derecha
+ *   derecha → par anterior (o portada)
+ */
+function bookHasPairSpread(){
+  const s=bookState;if(!s)return false;
+  if(window.innerWidth<700)return false;
+  const spread=bookSpreadForState(s);
+  return !!(spread.desktop && !spread.single && spread.left && spread.right);
+}
+
+async function bookArrowLeft(){
+  const s=bookState;if(!s)return;
+  if(s.index===0){
+    // Portada → abrir / avanzar
+    await bookNext();
+    return;
+  }
+  if(bookHasPairSpread()){
+    if((s.pageFocus||'right')==='right'){
+      s.pageFocus='left';
+      s.animDirection='';
+      renderBook();
+      return;
+    }
+    // En izquierda: siguiente spread, empezar en derecha
+    s.pageFocus='right';
+    await bookNext();
+    return;
+  }
+  await bookNext();
+}
+
+async function bookArrowRight(){
+  const s=bookState;if(!s)return;
+  if(s.index===0){
+    // Portada: flecha derecha = tomo anterior / menú
+    await bookPrev();
+    return;
+  }
+  if(bookHasPairSpread()){
+    if((s.pageFocus||'right')==='left'){
+      s.pageFocus='right';
+      s.animDirection='';
+      renderBook();
+      return;
+    }
+    // En derecha: spread anterior, quedar en la izquierda de ese par
+    s.pageFocus='left';
+    await bookPrev();
+    // Si al volver no hay par, no forzar left
+    if(bookState===s && !bookHasPairSpread()){
+      s.pageFocus='right';
+      renderBook();
+    }
+    return;
+  }
+  await bookPrev();
 }
 
 async function bookNext(){
@@ -1183,6 +1264,7 @@ async function openBookUI(mid,tid,book,start,opts={}){
     navTomos:tomos||[],
     chapterFlash:false,
     animDirection:'',
+    pageFocus:'right',
     touchX:null,
     imageCache:bookState?.imageCache instanceof Map ? bookState.imageCache : new Map()
   };
@@ -1234,13 +1316,13 @@ async function toggleBookFullscreen(){const p=document.querySelector('.book-read
 document.addEventListener('keydown',e=>{
   if(!bookState)return;
   if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
-  if(e.key==='ArrowLeft'){e.preventDefault();bookNext();}
-  else if(e.key==='ArrowRight'){e.preventDefault();bookPrev();}
+  if(e.key==='ArrowLeft'){e.preventDefault();bookArrowLeft();}
+  else if(e.key==='ArrowRight'){e.preventDefault();bookArrowRight();}
   else if(e.key==='Escape'&&document.fullscreenElement)document.exitFullscreen?.();
 });
 
 document.addEventListener('touchstart',e=>{if(!bookState||e.touches.length!==1)return;bookState.touchX=e.touches[0].clientX;},{passive:true});
-document.addEventListener('touchend',e=>{if(!bookState||bookState.touchX==null)return;const dx=e.changedTouches[0].clientX-bookState.touchX;bookState.touchX=null;if(Math.abs(dx)>55){if(dx<0)bookNext();else bookPrev();}},{passive:true});
+document.addEventListener('touchend',e=>{if(!bookState||bookState.touchX==null)return;const dx=e.changedTouches[0].clientX-bookState.touchX;bookState.touchX=null;if(Math.abs(dx)>55){if(dx<0)bookArrowLeft();else bookArrowRight();}},{passive:true});
 
 
 function setupNormalProgress(target,mid,tid,cid){

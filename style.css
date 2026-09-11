@@ -1300,3 +1300,56 @@ body.reader-mode.reader-controls-hidden .social-bar-inline{
   .manga-social-footer{margin-top:28px}
   .fb-avatar{width:32px;height:32px;flex-basis:32px;font-size:12px}
 }
+
+
+/* Zoom automático a la página que se está leyendo (modo libro) */
+.book-stage.book-two-pages{
+  overflow:hidden;
+}
+.book-spread.book-zoom-right,
+.book-spread.book-zoom-left{
+  transition: transform .38s cubic-bezier(.22,.72,.26,1), filter .3s ease;
+  will-change: transform;
+}
+.book-stage.book-focus-right .book-spread.book-zoom-right{
+  transform: scale(1.42) translateX(16%);
+  transform-origin: center center;
+}
+.book-stage.book-focus-left .book-spread.book-zoom-left{
+  transform: scale(1.42) translateX(-16%);
+  transform-origin: center center;
+}
+.book-stage.book-focus-right .book-sheet[data-side="right"],
+.book-stage.book-focus-left .book-sheet[data-side="left"]{
+  filter:none;
+  opacity:1;
+  z-index:2;
+}
+.book-stage.book-focus-right .book-sheet[data-side="left"],
+.book-stage.book-focus-left .book-sheet[data-side="right"]{
+  opacity:.55;
+  filter:brightness(.72);
+}
+.book-sheet[data-side]{
+  transition: opacity .3s ease, filter .3s ease;
+}
+
+@media (max-width:699px){
+  .book-spread.book-zoom-right,
+  .book-spread.book-zoom-left{
+    transform:none !important;
+  }
+  .book-stage.book-focus-right .book-sheet,
+  .book-stage.book-focus-left .book-sheet{
+    opacity:1 !important;
+    filter:none !important;
+  }
+}
+
+@media (prefers-reduced-motion:reduce){
+  .book-spread.book-zoom-right,
+  .book-spread.book-zoom-left,
+  .book-sheet[data-side]{
+    transition:none;
+  }
+}
