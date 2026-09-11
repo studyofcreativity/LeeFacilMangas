@@ -143,28 +143,47 @@ async function refreshComments(chapterId){
 }
 
 async function refreshSocialBar(chapterId){
-  const bar=document.getElementById('social-bar');
-  if(!bar)return;
   const st=await loadReactionState(chapterId);
-  bar.innerHTML=`
-    <button type="button" class="react-btn ${st.mine==='like'?'active like':''}" onclick="setReaction('${chapterId}','like')">👍 <span id="like-count">${st.likes}</span></button>
-    <button type="button" class="react-btn ${st.mine==='dislike'?'active dislike':''}" onclick="setReaction('${chapterId}','dislike')">👎 <span id="dislike-count">${st.dislikes}</span></button>
-  `;
+  const likeHtml=`👍 Me gusta <span id="like-count">${st.likes}</span>`;
+  const dislikeHtml=`👎 No me gusta <span id="dislike-count">${st.dislikes}</span>`;
+  const likeClass=`react-btn ${st.mine==='like'?'active like':''}`;
+  const dislikeClass=`react-btn ${st.mine==='dislike'?'active dislike':''}`;
+  const bar=document.getElementById('social-bar');
+  if(bar){
+    bar.innerHTML=`
+      <button type="button" class="${likeClass}" onclick="setReaction('${chapterId}','like')">${likeHtml}</button>
+      <button type="button" class="${dislikeClass}" onclick="setReaction('${chapterId}','dislike')">${dislikeHtml}</button>
+      <button type="button" class="react-btn react-comments-jump" onclick="document.getElementById('social-panel')?.scrollIntoView({behavior:'smooth'})">💬 Comentarios</button>`;
+  }
+  const bar2=document.getElementById('social-bar-bottom');
+  if(bar2){
+    bar2.innerHTML=`
+      <button type="button" class="${likeClass}" onclick="setReaction('${chapterId}','like')">👍 Me gusta <span class="like-count-bottom">${st.likes}</span></button>
+      <button type="button" class="${dislikeClass}" onclick="setReaction('${chapterId}','dislike')">👎 No me gusta <span class="dislike-count-bottom">${st.dislikes}</span></button>`;
+  }
+}
+
+function socialBarHtml(chapterId){
+  return `<div class="social-bar social-bar-inline" id="social-bar" data-chapter-id="${chapterId}">
+    <button type="button" class="react-btn" onclick="setReaction('${chapterId}','like')">👍 Me gusta <span id="like-count">…</span></button>
+    <button type="button" class="react-btn" onclick="setReaction('${chapterId}','dislike')">👎 No me gusta <span id="dislike-count">…</span></button>
+    <button type="button" class="react-btn react-comments-jump" onclick="document.getElementById('social-panel')?.scrollIntoView({behavior:'smooth'})">💬 Comentarios</button>
+  </div>`;
 }
 
 function socialPanelHtml(chapterId){
   return `
 <section class="social-panel" id="social-panel">
-  <div class="social-bar" id="social-bar">
-    <button type="button" class="react-btn" disabled>👍 …</button>
-    <button type="button" class="react-btn" disabled>👎 …</button>
+  <div class="social-bar" id="social-bar-bottom">
+    <button type="button" class="react-btn" onclick="setReaction('${chapterId}','like')">👍 Me gusta <span class="like-count-bottom">…</span></button>
+    <button type="button" class="react-btn" onclick="setReaction('${chapterId}','dislike')">👎 No me gusta <span class="dislike-count-bottom">…</span></button>
   </div>
   <div class="comments-box">
-    <h3 class="comments-title">Comentarios</h3>
+    <h3 class="comments-title">💬 Comentarios</h3>
     <div id="comments-list" class="comments-list"><div class="comments-loading">Cargando...</div></div>
     <div class="comment-form">
-      <textarea id="comment-input" maxlength="2000" rows="2" placeholder="Escribe un comentario..."></textarea>
-      <button type="button" class="comment-send" onclick="postComment('${chapterId}')">Publicar</button>
+      <textarea id="comment-input" maxlength="2000" rows="3" placeholder="Escribe un comentario..."></textarea>
+      <button type="button" class="comment-send" onclick="postComment('${chapterId}')">Publicar comentario</button>
     </div>
   </div>
 </section>`;
@@ -368,7 +387,7 @@ async function openChapter(mid,tid,cid,tomo,cap){
 }
 function normalReaderHtml(mid,tid,cid,tomo,cap,pages,nav,index,previous,next,totalChapters){return `
 <aside class="reader-toolbar"><div class="toolbar-title">Lectura</div><div class="toolbar-section"><div class="toolbar-label">Tamaño</div><button class="size-btn ${readerSize==='chico'?'active':''}" onclick="setReaderSize('chico')">Chico</button><button class="size-btn ${readerSize==='normal'?'active':''}" onclick="setReaderSize('normal')">Normal</button><button class="size-btn ${readerSize==='grande'?'active':''}" onclick="setReaderSize('grande')">Grande</button><button class="size-btn ${readerSize==='muy-grande'?'active':''}" onclick="setReaderSize('muy-grande')">Muy grande</button></div><div class="toolbar-section"><div class="toolbar-label">Ancho</div><button class="width-btn ${readerWidth==='estrecho'?'active':''}" onclick="setReaderWidth('estrecho')">Estrecho</button><button class="width-btn ${readerWidth==='normal'?'active':''}" onclick="setReaderWidth('normal')">Normal</button><button class="width-btn ${readerWidth==='gordo'?'active':''}" onclick="setReaderWidth('gordo')">Gordo</button><button class="width-btn ${readerWidth==='muy-gordo'?'active':''}" onclick="setReaderWidth('muy-gordo')">Muy gordo</button></div><div class="toolbar-section toolbar-fullscreen"><button id="fullscreenBtn" class="fullscreen-btn" onclick="toggleFullscreen()">⛶ Pantalla completa</button></div><div class="toolbar-section"><button class="reader-book-switch" onclick="readerMode='libro';localStorage.setItem('lfm_reader_mode','libro');openBookChapter('${mid}','${tid}','${cid}',${tomo},${cap})">📕 Modo Libro</button></div></aside>
-<div class="chapter-reader-content"><button class="back" onclick="openTomo('${mid}','${tid}',${tomo})">← Volver al tomo</button><div class="reader-header reader-meta-top"><div class="reader-meta-title-row"><div class="reader-meta-name">${escapeHtml(nav.mangaName)}</div><button id="reader-eye-toggle" class="reader-eye-toggle" type="button" onclick="toggleReaderControls()" aria-label="${readerControlsHidden?'Mostrar menú':'Ocultar menú'}" title="${readerControlsHidden?'Mostrar menú':'Ocultar menú'}">${readerControlsHidden?eyeClosedIcon():eyeOpenIcon()}</button></div><div class="reader-meta-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div></div><button class="reader-side-nav reader-side-prev ${previous?'':'disabled'}" ${previous?`onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"`:'disabled'} aria-label="Capítulo anterior">‹</button><button class="reader-side-nav reader-side-next ${next?'':'disabled'}" ${next?`onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"`:'disabled'} aria-label="Capítulo siguiente">›</button><div class="reader-wrap"><div id="reader" class="reader size-${readerSize} width-${readerWidth}">${pages.map(p=>`<img loading="lazy" src="${escapeHtml(p.imagen_url)}" alt="Página ${escapeHtml(String(p.numero))}" data-page-number="${p.numero}">`).join('')||'<div class="empty">Este capítulo no tiene páginas.</div>'}</div></div><div class="chapter-bottom-nav"><button class="chapter-nav-btn ${previous?'':'disabled'}" ${previous?`onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"`:'disabled'}>‹</button><div class="chapter-info"><div class="chapter-manga-name">${escapeHtml(nav.mangaName)}</div><div class="chapter-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div><div class="chapter-counter">Capítulo ${index>=0?index+1:escapeHtml(String(cap))} de ${totalChapters}</div></div><button class="chapter-nav-btn ${next?'':'disabled'}" ${next?`onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"`:'disabled'}>›</button></div><div id="chapter-end-prompt" class="chapter-end-prompt" aria-live="polite"><button class="chapter-end-arrow chapter-end-prev ${previous?'':'disabled'}" ${previous?`onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"`:'disabled'}>‹</button><div class="chapter-end-info"><div class="chapter-end-manga">${escapeHtml(nav.mangaName)}</div><div class="chapter-end-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div></div><button class="chapter-end-arrow chapter-end-next ${next?'':'disabled'}" ${next?`onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"`:'disabled'}>›</button></div>
+<div class="chapter-reader-content"><button class="back" onclick="openTomo('${mid}','${tid}',${tomo})">← Volver al tomo</button><div class="reader-header reader-meta-top"><div class="reader-meta-title-row"><div class="reader-meta-name">${escapeHtml(nav.mangaName)}</div><button id="reader-eye-toggle" class="reader-eye-toggle" type="button" onclick="toggleReaderControls()" aria-label="${readerControlsHidden?'Mostrar menú':'Ocultar menú'}" title="${readerControlsHidden?'Mostrar menú':'Ocultar menú'}">${readerControlsHidden?eyeClosedIcon():eyeOpenIcon()}</button></div><div class="reader-meta-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div></div><button class="reader-side-nav reader-side-prev ${previous?'':'disabled'}" ${previous?`onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"`:'disabled'} aria-label="Capítulo anterior">‹</button><button class="reader-side-nav reader-side-next ${next?'':'disabled'}" ${next?`onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"`:'disabled'} aria-label="Capítulo siguiente">›</button>${socialBarHtml(cid)}<div class="reader-wrap"><div id="reader" class="reader size-${readerSize} width-${readerWidth}">${pages.map(p=>`<img loading="lazy" src="${escapeHtml(p.imagen_url)}" alt="Página ${escapeHtml(String(p.numero))}" data-page-number="${p.numero}">`).join('')||'<div class="empty">Este capítulo no tiene páginas.</div>'}</div></div><div class="chapter-bottom-nav"><button class="chapter-nav-btn ${previous?'':'disabled'}" ${previous?`onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"`:'disabled'}>‹</button><div class="chapter-info"><div class="chapter-manga-name">${escapeHtml(nav.mangaName)}</div><div class="chapter-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div><div class="chapter-counter">Capítulo ${index>=0?index+1:escapeHtml(String(cap))} de ${totalChapters}</div></div><button class="chapter-nav-btn ${next?'':'disabled'}" ${next?`onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"`:'disabled'}>›</button></div><div id="chapter-end-prompt" class="chapter-end-prompt" aria-live="polite"><button class="chapter-end-arrow chapter-end-prev ${previous?'':'disabled'}" ${previous?`onclick="openChapter('${mid}','${previous.tomoId}','${previous.id}',${previous.tomo},${previous.cap})"`:'disabled'}>‹</button><div class="chapter-end-info"><div class="chapter-end-manga">${escapeHtml(nav.mangaName)}</div><div class="chapter-end-location">Tomo ${escapeHtml(String(tomo))} · Capítulo ${escapeHtml(String(cap))}</div></div><button class="chapter-end-arrow chapter-end-next ${next?'':'disabled'}" ${next?`onclick="openChapter('${mid}','${next.tomoId}','${next.id}',${next.tomo},${next.cap})"`:'disabled'}>›</button></div>
 ${socialPanelHtml(cid)}
 </div>`;}
 
