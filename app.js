@@ -911,7 +911,7 @@ function renderBook(){
     </div>
     <div class="book-stage ${spread.desktop?'book-two-pages':''}${spread.single?' book-stage-single':''} ${spread.desktop&&!spread.single?('book-focus-'+s.pageFocus):''}">
       <button class="book-arrow book-arrow-left" onclick="bookArrowLeft()" aria-label="Avanzar">‹</button>
-      <div class="book-spread ${spread.desktop?'book-spread-pair':''} ${nextClass} ${spread.desktop&&!spread.single?('book-zoom-'+s.pageFocus):''}">
+      <div class="book-spread ${spread.desktop?'book-spread-pair':''} ${nextClass}">
         ${spread.desktop && spread.left ? renderBookPage(spread.left,s,'left') : ''}
         ${renderBookPage(spread.right,s,'right')}
       </div>
