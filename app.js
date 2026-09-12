@@ -874,36 +874,38 @@ function applyBookPageFocus(){
   const right=spread.querySelector('.book-sheet[data-side="right"]');
   if(!left||!right)return;
   if(window.innerWidth<700){
-    [left,right].forEach(el=>{
-      el.style.cssText='';
-    });
+    [left,right].forEach(el=>{ el.style.cssText=''; });
     return;
   }
   const focus=(s.pageFocus==='left')?'left':'right';
   const active=focus==='left'?left:right;
   const other=focus==='left'?right:left;
 
-  // Página activa: grande y centrada visualmente
-  active.style.setProperty('flex','3 1 0%','important');
-  active.style.setProperty('width','78%','important');
-  active.style.setProperty('max-width','78%','important');
+  // Menú oculto → zoom un poco mayor (pero moderado, sin exagerar)
+  const menuHidden = !!(s.controlsHidden || document.body.classList.contains('book-controls-hidden'));
+  const activeW = menuHidden ? '82%' : '72%';
+  const otherW  = menuHidden ? '18%' : '28%';
+  const otherOp = menuHidden ? '0.28' : '0.42';
+  const otherBr = menuHidden ? 'brightness(0.4)' : 'brightness(0.55)';
+
+  active.style.setProperty('flex','2.6 1 0%','important');
+  active.style.setProperty('width',activeW,'important');
+  active.style.setProperty('max-width',activeW,'important');
   active.style.setProperty('min-width','0','important');
   active.style.setProperty('opacity','1','important');
   active.style.setProperty('filter','none','important');
   active.style.setProperty('z-index','3','important');
   active.style.setProperty('transition','flex .3s ease,width .3s ease,max-width .3s ease,opacity .25s ease,filter .25s ease','important');
 
-  // Página inactiva: franja lateral
   other.style.setProperty('flex','1 1 0%','important');
-  other.style.setProperty('width','22%','important');
-  other.style.setProperty('max-width','22%','important');
+  other.style.setProperty('width',otherW,'important');
+  other.style.setProperty('max-width',otherW,'important');
   other.style.setProperty('min-width','0','important');
-  other.style.setProperty('opacity','0.32','important');
-  other.style.setProperty('filter','brightness(0.45)','important');
+  other.style.setProperty('opacity',otherOp,'important');
+  other.style.setProperty('filter',otherBr,'important');
   other.style.setProperty('z-index','1','important');
   other.style.setProperty('transition','flex .3s ease,width .3s ease,max-width .3s ease,opacity .25s ease,filter .25s ease','important');
 
-  // Asegurar contenedor flex
   spread.style.setProperty('display','flex','important');
   spread.style.setProperty('flex-direction','row','important');
   spread.style.setProperty('align-items','stretch','important');
