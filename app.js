@@ -873,30 +873,76 @@ const BOOK_ZOOM_MIN=1;
 const BOOK_ZOOM_MAX=2.35;
 const BOOK_ZOOM_STEP=0.18;
 
-function clampBookPan(s){
-  if(!s)return;
-  const z=Math.max(BOOK_ZOOM_MIN, Math.min(BOOK_ZOOM_MAX, s.viewZoom||1));
-  s.viewZoom=z;
-  if(z<=1.02){ s.viewPanX=0; s.viewPanY=0; return; }
-
-  // Libertad vertical crece con el zoom; horizontal solo con zoom alto
-  const vertFree = Math.max(0, (z-1) * 180);
-  const horizFree = z >= 1.55 ? Math.max(0, (z-1.45) * 90) : 0;
-
-  s.viewPanY = Math.max(-vertFree, Math.min(vertFree, s.viewPanY||0));
-  s.viewPanX = Math.max(-horizFree, Math.min(horizFree, s.viewPanX||0));
+/** Página activa actual (sheet + img) */
+function getActiveBookSheet(){
+  const stage=document.querySelector('.book-stage');
+  if(!stage || !bookState) return {stage:null,sheet:null,img:null};
+  let sheet=null;
+  if(window.innerWidth>=700){
+    const focus=(bookState.pageFocus==='left')?'left':'right';
+    sheet=stage.querySelector(`.book-sheet[data-side="${focus}"]`)
+      || stage.querySelector('.book-sheet:not(.book-blank)');
+  }else{
+    sheet=stage.querySelector('.book-sheet:not(.book-blank)');
+  }
+  return {stage, sheet, img: sheet?.querySelector('img')||null};
 }
 
-function applyBookViewTransform(){
+/**
+ * Límites reales según tamaño de la hoja y el zoom.
+ * maxPan ≈ (tamañoHoja * (zoom-1)) / 2  → generoso y contenido.
+ * Horizontal se habilita desde zoom moderado (no solo muy alto).
+ */
+function getBookPanLimits(s, sheet){
+  const z=Math.max(BOOK_ZOOM_MIN, Math.min(BOOK_ZOOM_MAX, s.viewZoom||1));
+  if(z<=1.02) return {maxX:0, maxY:0, z};
+
+  let w=0, h=0;
+  if(sheet){
+    // clientWidth/Height NO incluyen transform → límites estables
+    w=sheet.clientWidth || sheet.offsetWidth || 0;
+    h=sheet.clientHeight || sheet.offsetHeight || 0;
+  }
+  if(!w || !h){
+    w=window.innerWidth*0.7;
+    h=window.innerHeight*0.75;
+  }
+
+  // Área extra visible al escalar desde el centro
+  const maxY = Math.max(0, (h * (z - 1)) / 2);
+  // Horizontal: desde ~1.25x, proporcional (más generoso que antes)
+  const maxX = z >= 1.25
+    ? Math.max(0, (w * (z - 1)) / 2 * 0.92)
+    : Math.max(0, (w * (z - 1)) / 2 * 0.35);
+
+  return {maxX, maxY, z};
+}
+
+function clampBookPan(s, sheet){
+  if(!s)return;
+  const {maxX, maxY, z}=getBookPanLimits(s, sheet || getActiveBookSheet().sheet);
+  s.viewZoom=z;
+  if(z<=1.02){ s.viewPanX=0; s.viewPanY=0; return; }
+  s.viewPanX = Math.max(-maxX, Math.min(maxX, s.viewPanX||0));
+  s.viewPanY = Math.max(-maxY, Math.min(maxY, s.viewPanY||0));
+}
+
+/**
+ * Aplica zoom+pan a la imagen activa.
+ * @param {{animate?:boolean, skipClamp?:boolean}} opts
+ */
+function applyBookViewTransform(opts={}){
   const s=bookState;
   if(!s)return;
-  const stage=document.querySelector('.book-stage');
+  const {stage, sheet, img}=getActiveBookSheet();
   if(!stage)return;
 
-  // Limpiar transforms previos
-  stage.querySelectorAll('.book-sheet img').forEach(img=>{
-    img.style.transform='';
-    img.style.transition='';
+  // Limpiar transforms de otras hojas (no la activa todavía)
+  stage.querySelectorAll('.book-sheet img').forEach(el=>{
+    if(el!==img){
+      el.style.transform='';
+      el.style.transition='';
+    }
   });
   stage.querySelectorAll('.book-sheet').forEach(sh=>{
     sh.classList.remove('book-sheet-zoomed');
@@ -904,68 +950,42 @@ function applyBookViewTransform(){
 
   const z=Math.max(BOOK_ZOOM_MIN, Math.min(BOOK_ZOOM_MAX, s.viewZoom||1));
   s.viewZoom=z;
-  clampBookPan(s);
+  if(!opts.skipClamp) clampBookPan(s, sheet);
 
-  // Solo transformar la página activa (o la única visible)
-  let activeSheet=null;
-  if(window.innerWidth>=700){
-    const focus=(s.pageFocus==='left')?'left':'right';
-    activeSheet=stage.querySelector(`.book-sheet[data-side="${focus}"]`)
-      || stage.querySelector('.book-sheet:not(.book-blank)');
-  }else{
-    activeSheet=stage.querySelector('.book-sheet:not(.book-blank)');
-  }
-  if(!activeSheet)return;
-  const img=activeSheet.querySelector('img');
-  if(!img)return;
+  if(!sheet || !img)return;
 
-  activeSheet.classList.add('book-sheet-zoomed');
-  activeSheet.style.overflow='hidden';
+  sheet.classList.add('book-sheet-zoomed');
+  sheet.style.overflow='hidden';
+
+  const animate = opts.animate !== false && !opts.instant;
+  const transition = animate
+    ? 'transform .28s cubic-bezier(.22,.72,.26,1)'
+    : 'none';
 
   if(z<=1.01){
+    s.viewPanX=0; s.viewPanY=0;
+    img.style.transition=transition;
     img.style.transform='none';
-    img.style.transition='transform .28s cubic-bezier(.22,.72,.26,1)';
     return;
   }
 
   img.style.transformOrigin='center center';
-  img.style.transition='transform .28s cubic-bezier(.22,.72,.26,1)';
+  img.style.transition=transition;
   img.style.transform=`translate(${s.viewPanX||0}px, ${s.viewPanY||0}px) scale(${z})`;
-
-  // Tras el layout, reforzar límites reales con el tamaño del contenedor
-  requestAnimationFrame(()=>{
-    if(bookState!==s)return;
-    const sh=activeSheet.getBoundingClientRect();
-    const ir=img.getBoundingClientRect();
-    // Con scale, el rect ya incluye el transform visual
-    // Clamp adicional: no dejar huecos fuera de la hoja
-    const maxX = Math.max(0, (ir.width - sh.width) / 2);
-    const maxY = Math.max(0, (ir.height - sh.height) / 2);
-    // Horizontal solo si zoom alto
-    const allowX = z >= 1.55 ? maxX : 0;
-    let px=s.viewPanX||0, py=s.viewPanY||0;
-    px=Math.max(-allowX, Math.min(allowX, px));
-    py=Math.max(-maxY, Math.min(maxY, py));
-    if(px!==s.viewPanX || py!==s.viewPanY){
-      s.viewPanX=px; s.viewPanY=py;
-      img.style.transition='none';
-      img.style.transform=`translate(${px}px, ${py}px) scale(${z})`;
-    }
-  });
 }
 
 function bookZoomIn(){
   const s=bookState; if(!s)return;
   s.viewZoom=Math.min(BOOK_ZOOM_MAX, (s.viewZoom||1)+BOOK_ZOOM_STEP);
   clampBookPan(s);
-  applyBookViewTransform();
+  applyBookViewTransform({animate:true});
   updateBookZoomButtons();
 }
 function bookZoomOut(){
   const s=bookState; if(!s)return;
   s.viewZoom=Math.max(BOOK_ZOOM_MIN, (s.viewZoom||1)-BOOK_ZOOM_STEP);
   clampBookPan(s);
-  applyBookViewTransform();
+  applyBookViewTransform({animate:true});
   updateBookZoomButtons();
 }
 function updateBookZoomButtons(){
@@ -1535,7 +1555,7 @@ function setupBookPanHandlers(){
   if(!stage || stage._bookPanBound) return;
   stage._bookPanBound=true;
 
-  let dragging=false, lastX=0, lastY=0;
+  let dragging=false, lastX=0, lastY=0, activeSheet=null, activeImg=null;
 
   // Bloquear menú contextual / long-press de imagen en todo el stage
   stage.addEventListener('contextmenu',e=>{
@@ -1547,39 +1567,47 @@ function setupBookPanHandlers(){
   const onDown=(clientX,clientY,target)=>{
     const s=bookState;
     if(!s || (s.viewZoom||1) <= 1.05) return false;
-    // No iniciar drag desde flechas o botones de zoom
     if(target?.closest?.('.book-arrow, .book-zoom-controls, .book-topbar, .book-eye, .book-full')) return false;
+    const ref=getActiveBookSheet();
+    activeSheet=ref.sheet;
+    activeImg=ref.img;
+    if(!activeImg) return false;
     dragging=true;
     lastX=clientX; lastY=clientY;
     stage.classList.add('book-panning');
     document.body.classList.add('book-panning');
+    // Sin transición durante el arrastre
+    activeImg.style.transition='none';
     return true;
   };
   const onMove=(clientX,clientY)=>{
-    if(!dragging || !bookState) return;
+    if(!dragging || !bookState || !activeImg) return;
     const s=bookState;
     const dx=clientX-lastX, dy=clientY-lastY;
     lastX=clientX; lastY=clientY;
     s.viewPanX=(s.viewPanX||0)+dx;
     s.viewPanY=(s.viewPanY||0)+dy;
-    clampBookPan(s);
-    const focus=(s.pageFocus==='left')?'left':'right';
-    const sheet=stage.querySelector(`.book-sheet[data-side="${focus}"]`) || stage.querySelector('.book-sheet:not(.book-blank)');
-    const img=sheet?.querySelector('img');
-    if(img){
-      img.style.transition='none';
-      img.style.transform=`translate(${s.viewPanX}px, ${s.viewPanY}px) scale(${s.viewZoom||1})`;
-    }
+    // Clamp generoso con tamaño real de la hoja
+    clampBookPan(s, activeSheet);
+    activeImg.style.transition='none';
+    activeImg.style.transform=`translate(${s.viewPanX}px, ${s.viewPanY}px) scale(${s.viewZoom||1})`;
   };
   const onUp=()=>{
     if(!dragging) return;
     dragging=false;
     stage.classList.remove('book-panning');
     document.body.classList.remove('book-panning');
-    applyBookViewTransform();
+    // IMPORTANTE: quedarse donde el usuario soltó (sin animar de vuelta al centro)
+    if(bookState && activeImg){
+      clampBookPan(bookState, activeSheet);
+      activeImg.style.transition='none';
+      activeImg.style.transform=`translate(${bookState.viewPanX||0}px, ${bookState.viewPanY||0}px) scale(${bookState.viewZoom||1})`;
+    }
+    activeSheet=null;
+    activeImg=null;
   };
 
-  // pointer events (desktop + la mayoría de móviles modernos)
+  // pointer events (desktop + móviles modernos)
   stage.addEventListener('pointerdown',e=>{
     if(e.button!==0 && e.pointerType!=='touch') return;
     if(onDown(e.clientX,e.clientY,e.target)){
@@ -1594,12 +1622,11 @@ function setupBookPanHandlers(){
   stage.addEventListener('pointercancel',onUp);
   stage.addEventListener('lostpointercapture',onUp);
 
-  // touch nativo: preventDefault en touchstart cancela el long-press del navegador
+  // touch nativo: preventDefault cancela long-press
   stage.addEventListener('touchstart',e=>{
     if(!bookState || (bookState.viewZoom||1) <= 1.05) return;
     if(e.target?.closest?.('.book-arrow, .book-zoom-controls, .book-topbar, .book-eye, .book-full')) return;
     if(e.touches.length===1){
-      // Imprescindible para que iOS/Android no activen callout / menú de imagen
       e.preventDefault();
       onDown(e.touches[0].clientX, e.touches[0].clientY, e.target);
     }
