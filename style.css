@@ -1392,3 +1392,91 @@ body.reader-mode.reader-controls-hidden .social-bar-inline{
     filter:none !important;
   }
 }
+
+/* ===== Controles de zoom modo libro ===== */
+.book-zoom-controls{
+  position:absolute;
+  right:18px;
+  bottom:18px;
+  z-index:40;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 8px;
+  border-radius:12px;
+  background:rgba(16,16,20,.82);
+  border:1px solid rgba(255,255,255,.1);
+  backdrop-filter:blur(8px);
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+  pointer-events:auto;
+  user-select:none;
+}
+.book-zoom-btn{
+  width:36px;
+  height:36px;
+  border-radius:9px;
+  border:1px solid #3a3a43;
+  background:#25252c;
+  color:#eee;
+  font-size:22px;
+  line-height:1;
+  font-weight:600;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:background .15s ease,border-color .15s ease,opacity .15s ease,transform .12s ease;
+}
+.book-zoom-btn:hover:not(.disabled):not(:disabled){
+  background:#303038;
+  border-color:#e53945;
+  transform:scale(1.04);
+}
+.book-zoom-btn.disabled,
+.book-zoom-btn:disabled{
+  opacity:.28;
+  cursor:not-allowed;
+  transform:none;
+}
+.book-zoom-label{
+  min-width:44px;
+  text-align:center;
+  font-size:12px;
+  font-weight:600;
+  color:#c8c8d0;
+  font-variant-numeric:tabular-nums;
+}
+.book-sheet-zoomed{
+  overflow:hidden !important;
+}
+.book-stage.book-panning{
+  cursor:grabbing;
+}
+.book-stage.book-panning .book-sheet img{
+  cursor:grabbing;
+}
+.book-stage .book-sheet-zoomed img{
+  cursor:grab;
+  will-change:transform;
+}
+/* Menú oculto: controles de zoom siguen visibles y discretos */
+.book-controls-hidden .book-zoom-controls{
+  opacity:.92;
+  bottom:14px;
+  right:14px;
+}
+.book-reader-page:fullscreen .book-zoom-controls,
+.book-reader-page:-webkit-full-screen .book-zoom-controls{
+  bottom:20px;
+  right:20px;
+}
+@media (max-width:699px){
+  .book-zoom-controls{
+    right:10px;
+    bottom:10px;
+    padding:4px 6px;
+    gap:4px;
+  }
+  .book-zoom-btn{width:32px;height:32px;font-size:20px}
+  .book-zoom-label{min-width:38px;font-size:11px}
+}

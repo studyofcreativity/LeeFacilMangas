@@ -744,7 +744,10 @@ async function switchTomoAnimated(mid,tid,direction){
     animDirection:'',
     pageFocus:'right',
     touchX:null,
-    imageCache:new Map()
+    imageCache:new Map(),
+    viewZoom:1,
+    viewPanX:0,
+    viewPanY:0
   };
 
   document.body.classList.add('reader-mode','book-mode');
@@ -863,53 +866,186 @@ function bookSpreadForState(state){
 }
 
 
-/** Aplica zoom/cámara a la página activa con estilos en línea (no lo anula el CSS). */
+/* ===== Zoom + cámara del modo libro (pantalla completa / lectura) ===== */
+const BOOK_ZOOM_MIN=1;
+const BOOK_ZOOM_MAX=2.35;
+const BOOK_ZOOM_STEP=0.18;
+
+function clampBookPan(s){
+  if(!s)return;
+  const z=Math.max(BOOK_ZOOM_MIN, Math.min(BOOK_ZOOM_MAX, s.viewZoom||1));
+  s.viewZoom=z;
+  if(z<=1.02){ s.viewPanX=0; s.viewPanY=0; return; }
+
+  // Libertad vertical crece con el zoom; horizontal solo con zoom alto
+  const vertFree = Math.max(0, (z-1) * 180);
+  const horizFree = z >= 1.55 ? Math.max(0, (z-1.45) * 90) : 0;
+
+  s.viewPanY = Math.max(-vertFree, Math.min(vertFree, s.viewPanY||0));
+  s.viewPanX = Math.max(-horizFree, Math.min(horizFree, s.viewPanX||0));
+}
+
+function applyBookViewTransform(){
+  const s=bookState;
+  if(!s)return;
+  const stage=document.querySelector('.book-stage');
+  if(!stage)return;
+
+  // Limpiar transforms previos
+  stage.querySelectorAll('.book-sheet img').forEach(img=>{
+    img.style.transform='';
+    img.style.transition='';
+  });
+  stage.querySelectorAll('.book-sheet').forEach(sh=>{
+    sh.classList.remove('book-sheet-zoomed');
+  });
+
+  const z=Math.max(BOOK_ZOOM_MIN, Math.min(BOOK_ZOOM_MAX, s.viewZoom||1));
+  s.viewZoom=z;
+  clampBookPan(s);
+
+  // Solo transformar la página activa (o la única visible)
+  let activeSheet=null;
+  if(window.innerWidth>=700){
+    const focus=(s.pageFocus==='left')?'left':'right';
+    activeSheet=stage.querySelector(`.book-sheet[data-side="${focus}"]`)
+      || stage.querySelector('.book-sheet:not(.book-blank)');
+  }else{
+    activeSheet=stage.querySelector('.book-sheet:not(.book-blank)');
+  }
+  if(!activeSheet)return;
+  const img=activeSheet.querySelector('img');
+  if(!img)return;
+
+  activeSheet.classList.add('book-sheet-zoomed');
+  activeSheet.style.overflow='hidden';
+
+  if(z<=1.01){
+    img.style.transform='none';
+    img.style.transition='transform .28s cubic-bezier(.22,.72,.26,1)';
+    return;
+  }
+
+  img.style.transformOrigin='center center';
+  img.style.transition='transform .28s cubic-bezier(.22,.72,.26,1)';
+  img.style.transform=`translate(${s.viewPanX||0}px, ${s.viewPanY||0}px) scale(${z})`;
+
+  // Tras el layout, reforzar límites reales con el tamaño del contenedor
+  requestAnimationFrame(()=>{
+    if(bookState!==s)return;
+    const sh=activeSheet.getBoundingClientRect();
+    const ir=img.getBoundingClientRect();
+    // Con scale, el rect ya incluye el transform visual
+    // Clamp adicional: no dejar huecos fuera de la hoja
+    const maxX = Math.max(0, (ir.width - sh.width) / 2);
+    const maxY = Math.max(0, (ir.height - sh.height) / 2);
+    // Horizontal solo si zoom alto
+    const allowX = z >= 1.55 ? maxX : 0;
+    let px=s.viewPanX||0, py=s.viewPanY||0;
+    px=Math.max(-allowX, Math.min(allowX, px));
+    py=Math.max(-maxY, Math.min(maxY, py));
+    if(px!==s.viewPanX || py!==s.viewPanY){
+      s.viewPanX=px; s.viewPanY=py;
+      img.style.transition='none';
+      img.style.transform=`translate(${px}px, ${py}px) scale(${z})`;
+    }
+  });
+}
+
+function bookZoomIn(){
+  const s=bookState; if(!s)return;
+  s.viewZoom=Math.min(BOOK_ZOOM_MAX, (s.viewZoom||1)+BOOK_ZOOM_STEP);
+  clampBookPan(s);
+  applyBookViewTransform();
+  updateBookZoomButtons();
+}
+function bookZoomOut(){
+  const s=bookState; if(!s)return;
+  s.viewZoom=Math.max(BOOK_ZOOM_MIN, (s.viewZoom||1)-BOOK_ZOOM_STEP);
+  clampBookPan(s);
+  applyBookViewTransform();
+  updateBookZoomButtons();
+}
+function updateBookZoomButtons(){
+  const s=bookState;
+  const zin=document.getElementById('book-zoom-in');
+  const zout=document.getElementById('book-zoom-out');
+  if(!zin||!zout||!s)return;
+  const z=s.viewZoom||1;
+  zout.disabled = z <= BOOK_ZOOM_MIN + 0.01;
+  zin.disabled  = z >= BOOK_ZOOM_MAX - 0.01;
+  zout.classList.toggle('disabled', zout.disabled);
+  zin.classList.toggle('disabled', zin.disabled);
+  const label=document.getElementById('book-zoom-label');
+  if(label) label.textContent = Math.round(z*100)+'%';
+}
+
+/** Aplica foco de página (par) + zoom/cámara. */
 function applyBookPageFocus(){
   const s=bookState;
   if(!s)return;
   const stage=document.querySelector('.book-stage');
   const spread=document.querySelector('.book-spread.book-spread-pair');
-  if(!stage||!spread)return;
+  if(!stage)return;
+
+  if(window.innerWidth<700){
+    if(spread){
+      spread.querySelectorAll('.book-sheet').forEach(el=>{ el.style.cssText=''; });
+    }
+    applyBookViewTransform();
+    updateBookZoomButtons();
+    return;
+  }
+  if(!spread){
+    applyBookViewTransform();
+    updateBookZoomButtons();
+    return;
+  }
   const left=spread.querySelector('.book-sheet[data-side="left"]');
   const right=spread.querySelector('.book-sheet[data-side="right"]');
-  if(!left||!right)return;
-  if(window.innerWidth<700){
-    [left,right].forEach(el=>{
-      el.style.cssText='';
-    });
+  if(!left||!right){
+    applyBookViewTransform();
+    updateBookZoomButtons();
     return;
   }
   const focus=(s.pageFocus==='left')?'left':'right';
   const active=focus==='left'?left:right;
   const other=focus==='left'?right:left;
 
-  // Página activa: grande y centrada visualmente
+  // Menú oculto → ratios un poco más moderados para no cortar contenido
+  const menuHidden = !!(s.controlsHidden);
+  const activeW = menuHidden ? '74%' : '78%';
+  const otherW  = menuHidden ? '26%' : '22%';
+  const otherOp = menuHidden ? '0.38' : '0.32';
+  const otherBr = menuHidden ? 'brightness(0.5)' : 'brightness(0.45)';
+
   active.style.setProperty('flex','3 1 0%','important');
-  active.style.setProperty('width','78%','important');
-  active.style.setProperty('max-width','78%','important');
+  active.style.setProperty('width',activeW,'important');
+  active.style.setProperty('max-width',activeW,'important');
   active.style.setProperty('min-width','0','important');
   active.style.setProperty('opacity','1','important');
   active.style.setProperty('filter','none','important');
   active.style.setProperty('z-index','3','important');
   active.style.setProperty('transition','flex .3s ease,width .3s ease,max-width .3s ease,opacity .25s ease,filter .25s ease','important');
 
-  // Página inactiva: franja lateral
   other.style.setProperty('flex','1 1 0%','important');
-  other.style.setProperty('width','22%','important');
-  other.style.setProperty('max-width','22%','important');
+  other.style.setProperty('width',otherW,'important');
+  other.style.setProperty('max-width',otherW,'important');
   other.style.setProperty('min-width','0','important');
-  other.style.setProperty('opacity','0.32','important');
-  other.style.setProperty('filter','brightness(0.45)','important');
+  other.style.setProperty('opacity',otherOp,'important');
+  other.style.setProperty('filter',otherBr,'important');
   other.style.setProperty('z-index','1','important');
   other.style.setProperty('transition','flex .3s ease,width .3s ease,max-width .3s ease,opacity .25s ease,filter .25s ease','important');
 
-  // Asegurar contenedor flex
   spread.style.setProperty('display','flex','important');
   spread.style.setProperty('flex-direction','row','important');
   spread.style.setProperty('align-items','stretch','important');
   spread.style.setProperty('width','100%','important');
   spread.style.setProperty('max-width','100%','important');
   spread.style.setProperty('transform','none','important');
+
+  applyBookViewTransform();
+  updateBookZoomButtons();
 }
 
 function renderBook(){
@@ -966,6 +1102,11 @@ function renderBook(){
         ${renderBookPage(spread.right,s,'right')}
       </div>
       <button class="book-arrow book-arrow-right" onclick="bookArrowRight()" aria-label="Retroceder">›</button>
+      <div class="book-zoom-controls" id="book-zoom-controls" aria-label="Zoom de página">
+        <button type="button" id="book-zoom-out" class="book-zoom-btn" onclick="bookZoomOut()" title="Alejar" aria-label="Alejar">−</button>
+        <span id="book-zoom-label" class="book-zoom-label">100%</span>
+        <button type="button" id="book-zoom-in" class="book-zoom-btn" onclick="bookZoomIn()" title="Acercar" aria-label="Acercar">+</button>
+      </div>
     </div>
     <div class="book-bottom"><span>${escapeHtml(tomoMeta)}</span><span>${s.index===0?'Portada':escapeHtml(chapterMeta)}</span></div>
     ${s.chapterFlash?`<div class="book-chapter-flash">Capítulo ${escapeHtml(String(currentRight?.chapter??''))}</div>`:''}`;
@@ -976,8 +1117,8 @@ function renderBook(){
   const direction=s.animDirection;
   s.animDirection='';
   preloadBookNeighbors();
-  // Zoom/cámara a la página activa (estilos en línea)
   applyBookPageFocus();
+  setupBookPanHandlers();
   const spreadEl=reader.querySelector('.book-spread');
   if(direction && spreadEl){
     window.setTimeout(()=>{
@@ -1000,6 +1141,9 @@ function setBookIndex(index,direction){
   const prevItem=getBookItem(s,prevIndex);
   s.index=next;
   s.animDirection=direction;
+  // Al cambiar de página/spread: recentrar cámara (mantener nivel de zoom)
+  s.viewPanX=0;
+  s.viewPanY=0;
   // Al cambiar de spread: avanzar → derecha; retroceder → izquierda (si hay par)
   if(direction==='next') s.pageFocus='right';
   else if(direction==='prev') s.pageFocus=s.pageFocus||'left';
@@ -1068,6 +1212,7 @@ async function bookArrowLeft(){
   if(bookHasPairSpread()){
     if((s.pageFocus||'right')==='right'){
       s.pageFocus='left';
+      s.viewPanX=0; s.viewPanY=0;
       s.animDirection='';
       renderBook();
       return;
@@ -1090,6 +1235,7 @@ async function bookArrowRight(){
   if(bookHasPairSpread()){
     if((s.pageFocus||'right')==='left'){
       s.pageFocus='right';
+      s.viewPanX=0; s.viewPanY=0;
       s.animDirection='';
       renderBook();
       return;
@@ -1320,7 +1466,10 @@ async function openBookUI(mid,tid,book,start,opts={}){
     animDirection:'',
     pageFocus:'right',
     touchX:null,
-    imageCache:bookState?.imageCache instanceof Map ? bookState.imageCache : new Map()
+    imageCache:bookState?.imageCache instanceof Map ? bookState.imageCache : new Map(),
+    viewZoom: bookState?.viewZoom > 1 ? Math.min(bookState.viewZoom, 1.4) : 1,
+    viewPanX:0,
+    viewPanY:0
   };
 
   // En escritorio, alinear al índice local par (página derecha del spread).
@@ -1364,19 +1513,108 @@ async function openBookUI(mid,tid,book,start,opts={}){
   }catch(e){}
 }
 
-function toggleBookControls(){if(!bookState)return;bookState.controlsHidden=!bookState.controlsHidden;renderBook();}
+function toggleBookControls(){
+  if(!bookState)return;
+  const willHide=!bookState.controlsHidden;
+  bookState.controlsHidden=willHide;
+  // Al ocultar el menú las páginas ocupan más espacio: bajar un poco el zoom para no cortar contenido
+  if(willHide && (bookState.viewZoom||1) > 1.05){
+    bookState.viewZoom=Math.max(BOOK_ZOOM_MIN, (bookState.viewZoom||1) - 0.22);
+    bookState.viewPanX=0;
+    bookState.viewPanY=0;
+  }
+  renderBook();
+}
 async function toggleBookFullscreen(){const p=document.querySelector('.book-reader-page');if(!p)return;try{if(!document.fullscreenElement){if(p.requestFullscreen)await p.requestFullscreen();else if(p.webkitRequestFullscreen)p.webkitRequestFullscreen();}else if(document.exitFullscreen)await document.exitFullscreen();}catch(e){console.error(e)}}
+
+/** Arrastre suave de la cámara cuando hay zoom (siempre dentro de la página). */
+function setupBookPanHandlers(){
+  const stage=document.querySelector('.book-stage');
+  if(!stage || stage._bookPanBound) return;
+  stage._bookPanBound=true;
+
+  let dragging=false, lastX=0, lastY=0;
+
+  const onDown=(clientX,clientY,target)=>{
+    const s=bookState;
+    if(!s || (s.viewZoom||1) <= 1.05) return false;
+    // No iniciar drag desde flechas o botones de zoom
+    if(target?.closest?.('.book-arrow, .book-zoom-controls, .book-topbar, .book-eye, .book-full')) return false;
+    dragging=true;
+    lastX=clientX; lastY=clientY;
+    stage.classList.add('book-panning');
+    return true;
+  };
+  const onMove=(clientX,clientY)=>{
+    if(!dragging || !bookState) return;
+    const s=bookState;
+    const dx=clientX-lastX, dy=clientY-lastY;
+    lastX=clientX; lastY=clientY;
+    s.viewPanX=(s.viewPanX||0)+dx;
+    s.viewPanY=(s.viewPanY||0)+dy;
+    clampBookPan(s);
+    // Aplicar sin transición mientras se arrastra
+    const focus=(s.pageFocus==='left')?'left':'right';
+    const sheet=stage.querySelector(`.book-sheet[data-side="${focus}"]`) || stage.querySelector('.book-sheet:not(.book-blank)');
+    const img=sheet?.querySelector('img');
+    if(img){
+      img.style.transition='none';
+      img.style.transform=`translate(${s.viewPanX}px, ${s.viewPanY}px) scale(${s.viewZoom||1})`;
+    }
+  };
+  const onUp=()=>{
+    if(!dragging) return;
+    dragging=false;
+    stage.classList.remove('book-panning');
+    applyBookViewTransform();
+  };
+
+  stage.addEventListener('pointerdown',e=>{
+    if(e.button!==0) return;
+    if(onDown(e.clientX,e.clientY,e.target)){
+      try{ stage.setPointerCapture(e.pointerId); }catch(_){}
+      e.preventDefault();
+    }
+  });
+  stage.addEventListener('pointermove',e=>{
+    if(dragging){ onMove(e.clientX,e.clientY); e.preventDefault(); }
+  });
+  stage.addEventListener('pointerup',onUp);
+  stage.addEventListener('pointercancel',onUp);
+  stage.addEventListener('pointerleave',()=>{ if(dragging) onUp(); });
+
+  // Rueda del ratón: zoom suave centrado
+  stage.addEventListener('wheel',e=>{
+    if(!bookState) return;
+    e.preventDefault();
+    if(e.deltaY < 0) bookZoomIn();
+    else bookZoomOut();
+  },{passive:false});
+}
 
 document.addEventListener('keydown',e=>{
   if(!bookState)return;
   if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
   if(e.key==='ArrowLeft'){e.preventDefault();bookArrowLeft();}
   else if(e.key==='ArrowRight'){e.preventDefault();bookArrowRight();}
+  else if(e.key==='+' || e.key==='='){e.preventDefault();bookZoomIn();}
+  else if(e.key==='-' || e.key==='_'){e.preventDefault();bookZoomOut();}
   else if(e.key==='Escape'&&document.fullscreenElement)document.exitFullscreen?.();
 });
 
-document.addEventListener('touchstart',e=>{if(!bookState||e.touches.length!==1)return;bookState.touchX=e.touches[0].clientX;},{passive:true});
-document.addEventListener('touchend',e=>{if(!bookState||bookState.touchX==null)return;const dx=e.changedTouches[0].clientX-bookState.touchX;bookState.touchX=null;if(Math.abs(dx)>55){if(dx<0)bookArrowLeft();else bookArrowRight();}},{passive:true});
+document.addEventListener('touchstart',e=>{
+  if(!bookState||e.touches.length!==1)return;
+  // Si hay zoom, el pan lo gestiona pointer; no interferir con swipe de página
+  if((bookState.viewZoom||1)>1.05) return;
+  bookState.touchX=e.touches[0].clientX;
+},{passive:true});
+document.addEventListener('touchend',e=>{
+  if(!bookState||bookState.touchX==null)return;
+  if((bookState.viewZoom||1)>1.05){ bookState.touchX=null; return; }
+  const dx=e.changedTouches[0].clientX-bookState.touchX;
+  bookState.touchX=null;
+  if(Math.abs(dx)>55){ if(dx<0) bookArrowLeft(); else bookArrowRight(); }
+},{passive:true});
 
 
 function setupNormalProgress(target,mid,tid,cid){
