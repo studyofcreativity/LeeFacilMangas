@@ -814,11 +814,13 @@ function renderBookPage(item,state,side){
   if(!item){
     return '<div class="book-sheet book-blank" aria-hidden="true"></div>';
   }
+  // draggable=false + oncontextmenu evitan menú de imagen / long-press en móvil
+  const imgAttrs='decoding="async" loading="eager" fetchpriority="high" draggable="false" oncontextmenu="return false"';
   if(item.type==='cover'){
     if(!item.src) return '<div class="book-sheet book-cover-sheet" aria-label="Portada sin imagen"></div>';
-    return `<div class="book-sheet book-cover-sheet" data-side="${side||''}"><img decoding="async" loading="eager" fetchpriority="high" src="${escapeHtml(item.src)}" alt="Portada del tomo"></div>`;
+    return `<div class="book-sheet book-cover-sheet" data-side="${side||''}"><img ${imgAttrs} src="${escapeHtml(item.src)}" alt="Portada del tomo"></div>`;
   }
-  return `<div class="book-sheet book-page-sheet" data-side="${side||''}" data-page="${escapeHtml(String(item.page))}"><img decoding="async" loading="eager" fetchpriority="high" src="${escapeHtml(item.src)}" alt="Página ${escapeHtml(String(item.page))}" data-book-page-id="${escapeHtml(item.id||'')}"></div>`;
+  return `<div class="book-sheet book-page-sheet" data-side="${side||''}" data-page="${escapeHtml(String(item.page))}"><img ${imgAttrs} src="${escapeHtml(item.src)}" alt="Página ${escapeHtml(String(item.page))}" data-book-page-id="${escapeHtml(item.id||'')}"></div>`;
 }
 
 function bookSpreadForState(state){
@@ -1535,6 +1537,13 @@ function setupBookPanHandlers(){
 
   let dragging=false, lastX=0, lastY=0;
 
+  // Bloquear menú contextual / long-press de imagen en todo el stage
+  stage.addEventListener('contextmenu',e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+  },{capture:true});
+
   const onDown=(clientX,clientY,target)=>{
     const s=bookState;
     if(!s || (s.viewZoom||1) <= 1.05) return false;
@@ -1543,6 +1552,7 @@ function setupBookPanHandlers(){
     dragging=true;
     lastX=clientX; lastY=clientY;
     stage.classList.add('book-panning');
+    document.body.classList.add('book-panning');
     return true;
   };
   const onMove=(clientX,clientY)=>{
@@ -1553,7 +1563,6 @@ function setupBookPanHandlers(){
     s.viewPanX=(s.viewPanX||0)+dx;
     s.viewPanY=(s.viewPanY||0)+dy;
     clampBookPan(s);
-    // Aplicar sin transición mientras se arrastra
     const focus=(s.pageFocus==='left')?'left':'right';
     const sheet=stage.querySelector(`.book-sheet[data-side="${focus}"]`) || stage.querySelector('.book-sheet:not(.book-blank)');
     const img=sheet?.querySelector('img');
@@ -1566,24 +1575,48 @@ function setupBookPanHandlers(){
     if(!dragging) return;
     dragging=false;
     stage.classList.remove('book-panning');
+    document.body.classList.remove('book-panning');
     applyBookViewTransform();
   };
 
+  // pointer events (desktop + la mayoría de móviles modernos)
   stage.addEventListener('pointerdown',e=>{
-    if(e.button!==0) return;
+    if(e.button!==0 && e.pointerType!=='touch') return;
     if(onDown(e.clientX,e.clientY,e.target)){
       try{ stage.setPointerCapture(e.pointerId); }catch(_){}
       e.preventDefault();
     }
-  });
+  },{passive:false});
   stage.addEventListener('pointermove',e=>{
     if(dragging){ onMove(e.clientX,e.clientY); e.preventDefault(); }
-  });
+  },{passive:false});
   stage.addEventListener('pointerup',onUp);
   stage.addEventListener('pointercancel',onUp);
-  stage.addEventListener('pointerleave',()=>{ if(dragging) onUp(); });
+  stage.addEventListener('lostpointercapture',onUp);
 
-  // Rueda del ratón: zoom suave centrado
+  // touch nativo: preventDefault en touchstart cancela el long-press del navegador
+  stage.addEventListener('touchstart',e=>{
+    if(!bookState || (bookState.viewZoom||1) <= 1.05) return;
+    if(e.target?.closest?.('.book-arrow, .book-zoom-controls, .book-topbar, .book-eye, .book-full')) return;
+    if(e.touches.length===1){
+      // Imprescindible para que iOS/Android no activen callout / menú de imagen
+      e.preventDefault();
+      onDown(e.touches[0].clientX, e.touches[0].clientY, e.target);
+    }
+  },{passive:false,capture:true});
+  stage.addEventListener('touchmove',e=>{
+    if(!dragging) return;
+    if(e.touches.length===1){
+      e.preventDefault();
+      onMove(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  },{passive:false,capture:true});
+  stage.addEventListener('touchend',e=>{
+    if(dragging){ e.preventDefault(); onUp(); }
+  },{passive:false,capture:true});
+  stage.addEventListener('touchcancel',()=>{ if(dragging) onUp(); },{capture:true});
+
+  // Rueda del ratón: zoom suave
   stage.addEventListener('wheel',e=>{
     if(!bookState) return;
     e.preventDefault();

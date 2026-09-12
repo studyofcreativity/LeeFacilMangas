@@ -1480,3 +1480,36 @@ body.reader-mode.reader-controls-hidden .social-bar-inline{
   .book-zoom-btn{width:32px;height:32px;font-size:20px}
   .book-zoom-label{min-width:38px;font-size:11px}
 }
+
+/* Evitar long-press / menú contextual de imagen en modo libro (móvil) */
+.book-stage,
+.book-stage .book-sheet,
+.book-stage .book-sheet img{
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+  user-drag: none;
+}
+.book-stage .book-sheet img{
+  pointer-events: auto;
+  touch-action: none;
+}
+/* Con zoom activo: el stage captura el gesto completo */
+.book-stage.book-panning,
+body.book-panning{
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  touch-action: none !important;
+  overscroll-behavior: none;
+}
+body.book-panning{
+  overflow: hidden;
+}
+.book-reader-page:fullscreen .book-stage .book-sheet img,
+.book-reader-page:-webkit-full-screen .book-stage .book-sheet img{
+  -webkit-touch-callout: none !important;
+  -webkit-user-drag: none !important;
+  touch-action: none;
+}
