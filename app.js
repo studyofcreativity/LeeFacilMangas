@@ -870,8 +870,8 @@ function bookSpreadForState(state){
 
 /* ===== Zoom + cámara del modo libro (pantalla completa / lectura) ===== */
 const BOOK_ZOOM_MIN=1;
-const BOOK_ZOOM_MAX=2.35;
-const BOOK_ZOOM_STEP=0.18;
+const BOOK_ZOOM_MAX=2.5;
+const BOOK_ZOOM_STEP=0.28; // 28% por paso
 
 /** Página activa actual (sheet + img) */
 function getActiveBookSheet(){
@@ -889,38 +889,47 @@ function getActiveBookSheet(){
 }
 
 /**
- * Límites reales según tamaño de la hoja y el zoom.
- * maxPan ≈ (tamañoHoja * (zoom-1)) / 2  → generoso y contenido.
- * Horizontal se habilita desde zoom moderado (no solo muy alto).
+ * Límites de pan generosos según el tamaño REAL de la imagen (sin transform)
+ * y del contenedor. Permite recorrer toda el área ampliada.
  */
-function getBookPanLimits(s, sheet){
+function getBookPanLimits(s, sheet, img){
   const z=Math.max(BOOK_ZOOM_MIN, Math.min(BOOK_ZOOM_MAX, s.viewZoom||1));
   if(z<=1.02) return {maxX:0, maxY:0, z};
 
-  let w=0, h=0;
+  // offsetWidth/Height NO se ven afectados por CSS transform → medición estable
+  let iw=0, ih=0, sw=0, sh=0;
+  if(img){
+    iw=img.offsetWidth || img.clientWidth || 0;
+    ih=img.offsetHeight || img.clientHeight || 0;
+  }
   if(sheet){
-    // clientWidth/Height NO incluyen transform → límites estables
-    w=sheet.clientWidth || sheet.offsetWidth || 0;
-    h=sheet.clientHeight || sheet.offsetHeight || 0;
+    sw=sheet.clientWidth || sheet.offsetWidth || 0;
+    sh=sheet.clientHeight || sheet.offsetHeight || 0;
   }
-  if(!w || !h){
-    w=window.innerWidth*0.7;
-    h=window.innerHeight*0.75;
+  if(!sw || !sh){
+    sw=window.innerWidth*0.85;
+    sh=window.innerHeight*0.8;
   }
+  if(!iw) iw=sw;
+  if(!ih) ih=sh;
 
-  // Área extra visible al escalar desde el centro
-  const maxY = Math.max(0, (h * (z - 1)) / 2);
-  // Horizontal: desde ~1.25x, proporcional (más generoso que antes)
-  const maxX = z >= 1.25
-    ? Math.max(0, (w * (z - 1)) / 2 * 0.92)
-    : Math.max(0, (w * (z - 1)) / 2 * 0.35);
+  // Tamaño visual tras el scale
+  const visW=iw*z, visH=ih*z;
+  // Pan máximo = lo que sobresale a cada lado (recorrer toda el área ampliada)
+  let maxX=Math.max(0, (visW - sw) / 2);
+  let maxY=Math.max(0, (visH - sh) / 2);
+
+  // Asegurar recorrido generoso aunque haya letterboxing
+  maxX=Math.max(maxX, (sw * (z - 1)) / 2);
+  maxY=Math.max(maxY, (sh * (z - 1)) / 2);
 
   return {maxX, maxY, z};
 }
 
-function clampBookPan(s, sheet){
+function clampBookPan(s, sheet, img){
   if(!s)return;
-  const {maxX, maxY, z}=getBookPanLimits(s, sheet || getActiveBookSheet().sheet);
+  const ref=(!sheet || !img) ? getActiveBookSheet() : {sheet, img};
+  const {maxX, maxY, z}=getBookPanLimits(s, ref.sheet, ref.img);
   s.viewZoom=z;
   if(z<=1.02){ s.viewPanX=0; s.viewPanY=0; return; }
   s.viewPanX = Math.max(-maxX, Math.min(maxX, s.viewPanX||0));
@@ -929,15 +938,17 @@ function clampBookPan(s, sheet){
 
 /**
  * Aplica zoom+pan a la imagen activa.
- * @param {{animate?:boolean, skipClamp?:boolean}} opts
+ * @param {{animate?:boolean, skipClamp?:boolean, instant?:boolean}} opts
  */
 function applyBookViewTransform(opts={}){
   const s=bookState;
   if(!s)return;
+  // No interferir mientras el usuario arrastra
+  if(s._isPanning && !opts.force) return;
+
   const {stage, sheet, img}=getActiveBookSheet();
   if(!stage)return;
 
-  // Limpiar transforms de otras hojas (no la activa todavía)
   stage.querySelectorAll('.book-sheet img').forEach(el=>{
     if(el!==img){
       el.style.transform='';
@@ -950,16 +961,16 @@ function applyBookViewTransform(opts={}){
 
   const z=Math.max(BOOK_ZOOM_MIN, Math.min(BOOK_ZOOM_MAX, s.viewZoom||1));
   s.viewZoom=z;
-  if(!opts.skipClamp) clampBookPan(s, sheet);
+  if(!opts.skipClamp) clampBookPan(s, sheet, img);
 
   if(!sheet || !img)return;
 
   sheet.classList.add('book-sheet-zoomed');
   sheet.style.overflow='hidden';
 
-  const animate = opts.animate !== false && !opts.instant;
+  const animate = !opts.instant && opts.animate !== false && !s._isPanning;
   const transition = animate
-    ? 'transform .28s cubic-bezier(.22,.72,.26,1)'
+    ? 'transform .25s cubic-bezier(.22,.72,.26,1)'
     : 'none';
 
   if(z<=1.01){
@@ -978,14 +989,14 @@ function bookZoomIn(){
   const s=bookState; if(!s)return;
   s.viewZoom=Math.min(BOOK_ZOOM_MAX, (s.viewZoom||1)+BOOK_ZOOM_STEP);
   clampBookPan(s);
-  applyBookViewTransform({animate:true});
+  applyBookViewTransform({animate:true, force:true});
   updateBookZoomButtons();
 }
 function bookZoomOut(){
   const s=bookState; if(!s)return;
   s.viewZoom=Math.max(BOOK_ZOOM_MIN, (s.viewZoom||1)-BOOK_ZOOM_STEP);
   clampBookPan(s);
-  applyBookViewTransform({animate:true});
+  applyBookViewTransform({animate:true, force:true});
   updateBookZoomButtons();
 }
 function updateBookZoomButtons(){
@@ -1555,28 +1566,29 @@ function setupBookPanHandlers(){
   if(!stage || stage._bookPanBound) return;
   stage._bookPanBound=true;
 
-  let dragging=false, lastX=0, lastY=0, activeSheet=null, activeImg=null;
+  let dragging=false, lastX=0, lastY=0, activeSheet=null, activeImg=null, pointerId=null;
 
-  // Bloquear menú contextual / long-press de imagen en todo el stage
   stage.addEventListener('contextmenu',e=>{
     e.preventDefault();
     e.stopPropagation();
     return false;
   },{capture:true});
 
-  const onDown=(clientX,clientY,target)=>{
+  const onDown=(clientX,clientY,target,pid)=>{
     const s=bookState;
     if(!s || (s.viewZoom||1) <= 1.05) return false;
     if(target?.closest?.('.book-arrow, .book-zoom-controls, .book-topbar, .book-eye, .book-full')) return false;
+    if(dragging) return false; // evitar doble inicio touch+pointer
     const ref=getActiveBookSheet();
     activeSheet=ref.sheet;
     activeImg=ref.img;
     if(!activeImg) return false;
     dragging=true;
+    s._isPanning=true;
+    pointerId=pid??null;
     lastX=clientX; lastY=clientY;
     stage.classList.add('book-panning');
     document.body.classList.add('book-panning');
-    // Sin transición durante el arrastre
     activeImg.style.transition='none';
     return true;
   };
@@ -1587,63 +1599,63 @@ function setupBookPanHandlers(){
     lastX=clientX; lastY=clientY;
     s.viewPanX=(s.viewPanX||0)+dx;
     s.viewPanY=(s.viewPanY||0)+dy;
-    // Clamp generoso con tamaño real de la hoja
-    clampBookPan(s, activeSheet);
+    clampBookPan(s, activeSheet, activeImg);
     activeImg.style.transition='none';
     activeImg.style.transform=`translate(${s.viewPanX}px, ${s.viewPanY}px) scale(${s.viewZoom||1})`;
   };
   const onUp=()=>{
     if(!dragging) return;
     dragging=false;
+    pointerId=null;
     stage.classList.remove('book-panning');
     document.body.classList.remove('book-panning');
-    // IMPORTANTE: quedarse donde el usuario soltó (sin animar de vuelta al centro)
-    if(bookState && activeImg){
-      clampBookPan(bookState, activeSheet);
-      activeImg.style.transition='none';
-      activeImg.style.transform=`translate(${bookState.viewPanX||0}px, ${bookState.viewPanY||0}px) scale(${bookState.viewZoom||1})`;
+    // Quedarse exactamente donde el usuario soltó (sin animación ni recentrado)
+    if(bookState){
+      bookState._isPanning=false;
+      if(activeImg){
+        clampBookPan(bookState, activeSheet, activeImg);
+        activeImg.style.transition='none';
+        activeImg.style.transform=`translate(${bookState.viewPanX||0}px, ${bookState.viewPanY||0}px) scale(${bookState.viewZoom||1})`;
+      }
     }
     activeSheet=null;
     activeImg=null;
   };
 
-  // pointer events (desktop + móviles modernos)
+  // Un solo camino con Pointer Events (funciona en PC y móvil moderno)
   stage.addEventListener('pointerdown',e=>{
-    if(e.button!==0 && e.pointerType!=='touch') return;
-    if(onDown(e.clientX,e.clientY,e.target)){
+    if(e.button!==0 && e.pointerType!=='touch' && e.pointerType!=='pen') return;
+    if(onDown(e.clientX,e.clientY,e.target,e.pointerId)){
       try{ stage.setPointerCapture(e.pointerId); }catch(_){}
       e.preventDefault();
+      e.stopPropagation();
     }
   },{passive:false});
   stage.addEventListener('pointermove',e=>{
-    if(dragging){ onMove(e.clientX,e.clientY); e.preventDefault(); }
+    if(!dragging) return;
+    if(pointerId!=null && e.pointerId!==pointerId) return;
+    onMove(e.clientX,e.clientY);
+    e.preventDefault();
   },{passive:false});
-  stage.addEventListener('pointerup',onUp);
-  stage.addEventListener('pointercancel',onUp);
-  stage.addEventListener('lostpointercapture',onUp);
+  stage.addEventListener('pointerup',e=>{
+    if(pointerId!=null && e.pointerId!==pointerId) return;
+    onUp();
+  });
+  stage.addEventListener('pointercancel',e=>{
+    if(pointerId!=null && e.pointerId!==pointerId) return;
+    onUp();
+  });
+  // NO usar lostpointercapture → evita recentrado accidental en móvil
 
-  // touch nativo: preventDefault cancela long-press
+  // touchstart solo para cancelar long-press (no inicia pan; lo hace pointer)
   stage.addEventListener('touchstart',e=>{
     if(!bookState || (bookState.viewZoom||1) <= 1.05) return;
     if(e.target?.closest?.('.book-arrow, .book-zoom-controls, .book-topbar, .book-eye, .book-full')) return;
     if(e.touches.length===1){
-      e.preventDefault();
-      onDown(e.touches[0].clientX, e.touches[0].clientY, e.target);
+      e.preventDefault(); // bloquea callout / menú de imagen
     }
   },{passive:false,capture:true});
-  stage.addEventListener('touchmove',e=>{
-    if(!dragging) return;
-    if(e.touches.length===1){
-      e.preventDefault();
-      onMove(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  },{passive:false,capture:true});
-  stage.addEventListener('touchend',e=>{
-    if(dragging){ e.preventDefault(); onUp(); }
-  },{passive:false,capture:true});
-  stage.addEventListener('touchcancel',()=>{ if(dragging) onUp(); },{capture:true});
 
-  // Rueda del ratón: zoom suave
   stage.addEventListener('wheel',e=>{
     if(!bookState) return;
     e.preventDefault();
